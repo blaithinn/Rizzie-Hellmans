@@ -6,6 +6,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED True)
 
 find_package(CURL REQUIRED)
 
-add_executable(client src/main.cpp)
+include_directories(include)
+
+add_executable(client src/main.cpp src/HttpClient.cpp)
 
 target_link_libraries(client CURL::libcurl)
