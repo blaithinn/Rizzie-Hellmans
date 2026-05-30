@@ -6,8 +6,16 @@ set(CMAKE_CXX_STANDARD_REQUIRED True)
 
 find_package(CURL REQUIRED)
 
-include_directories(include)
+# libsodium
+find_library(SODIUM_LIB sodium REQUIRED)
+find_path(SODIUM_INCLUDE sodium.h PATH_SUFFIXES sodium)
 
-add_executable(client src/main.cpp src/HttpClient.cpp)
+include_directories(include ${SODIUM_INCLUDE})
 
-target_link_libraries(client CURL::libcurl)
+add_executable(client
+    src/main.cpp
+    src/HttpClient.cpp
+    src/CryptoUtils.cpp
+)
+
+target_link_libraries(client CURL::libcurl ${SODIUM_LIB})
