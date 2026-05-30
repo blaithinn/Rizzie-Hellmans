@@ -1,17 +1,13 @@
 #include <iostream>
-#include "HttpClient.h"
-#include "CryptoUtils.h"
+#include <string>
+#include "Client.h"
 
 int main() {
     std::cout << "SecureChat C++ Client v0.1" << std::endl;
+    std::cout << "Connecting to rizzie-hellmans.theburkenator.com..." << std::endl;
 
-    // Test key pair generation
-    std::vector<unsigned char> publicKey, privateKey;
-    CryptoUtils::generateKeyPair(publicKey, privateKey);
-
-    std::string pubKeyB64 = CryptoUtils::toBase64(publicKey);
-    std::cout << "Generated public key (base64): " << pubKeyB64 << std::endl;
-    std::cout << "Key pair generation successful!" << std::endl;
+    // TODO: initialise Client and show menu loop in task 2.10
+    std::cout << "Client initialisation coming in task 2.10!!!!!:)" << std::endl;
 
     return 0;
 }
