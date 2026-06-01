@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Message Hash Verification — Rizzie-Hellmans</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #0f1117;
+      color: #e2e8f0;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem;
+    }
+
+    .card {
+      background: #1a1d27;
+      border: 1px solid #2d3148;
+      border-radius: 12px;
+      padding: 2.5rem;
+      width: 100%;
+      max-width: 640px;
+    }
+
+    h1 {
+      font-size: 1.5rem;
+      font-weight: 600;
+      color: #f1f5f9;
+      margin-bottom: 0.5rem;
+    }
+
+    .subtitle {
+      font-size: 0.9rem;
+      color: #94a3b8;
+      margin-bottom: 2rem;
+      line-height: 1.5;
+    }
+
+    label {
+      display: block;
+      font-size: 0.85rem;
+      font-weight: 500;
+      color: #cbd5e1;
+      margin-bottom: 0.5rem;
+    }
+
+    input[type="text"] {
+      width: 100%;
+      background: #0f1117;
+      border: 1px solid #2d3148;
+      border-radius: 8px;
+      padding: 0.75rem 1rem;
+      color: #e2e8f0;
+      font-size: 0.9rem;
+      font-family: 'SFMono-Regular', Consolas, monospace;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+
+    input[type="text"]:focus {
+      border-color: #6366f1;
+    }
+
+    input[type="text"]::placeholder {
+      color: #475569;
+    }
+
+    button {
+      margin-top: 1rem;
+      width: 100%;
+      background: #6366f1;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 0.75rem 1.5rem;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s, opacity 0.15s;
+    }
+
+    button:hover:not(:disabled) { background: #4f46e5; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    #result {
+      margin-top: 1.5rem;
+    }
+
+    .status-box {
+      border-radius: 10px;
+      padding: 1.25rem 1.5rem;
+      display: flex;
+      align-items: flex-start;
+      gap: 1rem;
+    }
+
+    .status-box.pass {
+      background: #052e16;
+      border: 1px solid #16a34a;
+    }
+
+    .status-box.fail {
+      background: #1f0a0a;
+      border: 1px solid #dc2626;
+    }
+
+    .badge {
+      font-size: 1rem;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      flex-shrink: 0;
+      padding: 0.2rem 0.6rem;
+      border-radius: 6px;
+    }
+
+    .pass .badge {
+      background: #16a34a;
+      color: #fff;
+    }
+
+    .fail .badge {
+      background: #dc2626;
+      color: #fff;
+    }
+
+    .status-detail {
+      flex: 1;
+    }
+
+    .status-detail strong {
+      display: block;
+      font-size: 0.95rem;
+      margin-bottom: 0.25rem;
+    }
+
+    .pass .status-detail strong { color: #4ade80; }
+    .fail .status-detail strong { color: #f87171; }
+
+    .status-detail span {
+      font-size: 0.83rem;
+      color: #94a3b8;
+      font-family: 'SFMono-Regular', Consolas, monospace;
+      word-break: break-all;
+    }
+
+    .loading {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      color: #94a3b8;
+      font-size: 0.9rem;
+      margin-top: 1rem;
+    }
+
+    .spinner {
+      width: 20px;
+      height: 20px;
+      border: 2px solid #2d3148;
+      border-top-color: #6366f1;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      flex-shrink: 0;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .hidden { display: none; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Blockchain Message Verification</h1>
+    <p class="subtitle">
+      Paste a transaction hash below to confirm that a message was recorded on the Sepolia blockchain.
+      A <strong>PASS</strong> result means the hash exists on-chain with a verified timestamp.
+    </p>
+
+    <label for="txInput">Transaction Hash</label>
+    <input
+      type="text"
+      id="txInput"
+      placeholder="0x..."
+      autocomplete="off"
+      spellcheck="false"
+    />
+    <button id="verifyBtn" onclick="verify()">Verify</button>
+
+    <div id="loading" class="loading hidden">
+      <div class="spinner"></div>
+      <span>Looking up transaction on Sepolia…</span>
+    </div>
+
+    <div id="result"></div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/ethers@6.13.0/dist/ethers.umd.min.js"></script>
+  <script>
+    const ALCHEMY_URL     = 'https://eth-sepolia.g.alchemy.com/v2/c-h7TYzFwnL7ugaFXJf2U';
+    const CONTRACT_ADDR   = '0xA1bdB7222B244417CCaB6EAeD2cd3d27dADee65A';
+
+    const EVENT_ABI = [
+      {
+        anonymous: false,
+        inputs: [
+          { indexed: true,  internalType: 'address', name: 'sender',    type: 'address'  },
+          { indexed: false, internalType: 'bytes32', name: 'hash',      type: 'bytes32'  },
+          { indexed: false, internalType: 'uint256', name: 'timestamp', type: 'uint256'  }
+        ],
+        name: 'HashStored',
+        type: 'event'
+      }
+    ];
+
+    async function verify() {
+      const txHash  = document.getElementById('txInput').value.trim();
+      const btn     = document.getElementById('verifyBtn');
+      const loading = document.getElementById('loading');
+      const result  = document.getElementById('result');
+
+      result.innerHTML = '';
+
+      if (!txHash) {
+        showFail('Please enter a transaction hash.');
+        return;
+      }
+
+      if (!/^0x[0-9a-fA-F]{64}$/.test(txHash)) {
+        showFail('Invalid format — a transaction hash must be 0x followed by 64 hex characters.');
+        return;
+      }
+
+      btn.disabled = true;
+      loading.classList.remove('hidden');
+
+      try {
+        const provider = new ethers.JsonRpcProvider(ALCHEMY_URL);
+        const receipt  = await provider.getTransactionReceipt(txHash);
+
+        if (!receipt) {
+          showFail('Transaction not found on Sepolia. It may not exist or may not yet be mined.');
+          return;
+        }
+
+        if (receipt.status !== 1) {
+          showFail('Transaction was found but it failed (status = 0). No hash was recorded.');
+          return;
+        }
+
+        const iface = new ethers.Interface(EVENT_ABI);
+        let found   = null;
+
+        for (const log of receipt.logs) {
+          if (log.address.toLowerCase() !== CONTRACT_ADDR.toLowerCase()) continue;
+          try {
+            const parsed = iface.parseLog({ topics: Array.from(log.topics), data: log.data });
+            if (parsed && parsed.name === 'HashStored') {
+              found = parsed;
+              break;
+            }
+          } catch (_) {
+            // log belongs to a different event — skip
+          }
+        }
+
+        if (!found) {
+          showFail('Transaction succeeded but no HashStored event was emitted by the contract.');
+          return;
+        }
+
+        const tsSeconds = Number(found.args.timestamp);
+        const date      = new Date(tsSeconds * 1000);
+        const dateStr   = date.toUTCString();
+
+        showPass(dateStr, found.args.hash);
+
+      } catch (err) {
+        showFail('Error contacting the network: ' + err.message);
+      } finally {
+        btn.disabled = false;
+        loading.classList.add('hidden');
+      }
+    }
+
+    function showPass(dateStr, hashBytes) {
+      const result = document.getElementById('result');
+      result.innerHTML = `
+        <div class="status-box pass">
+          <span class="badge">PASS</span>
+          <div class="status-detail">
+            <strong>Hash recorded on-chain</strong>
+            <span>Timestamp: ${escHtml(dateStr)}</span><br>
+            <span>Recorded hash: ${escHtml(hashBytes)}</span>
+          </div>
+        </div>`;
+    }
+
+    function showFail(reason) {
+      const result = document.getElementById('result');
+      result.innerHTML = `
+        <div class="status-box fail">
+          <span class="badge">FAIL</span>
+          <div class="status-detail">
+            <strong>Verification failed</strong>
+            <span>${escHtml(reason)}</span>
+          </div>
+        </div>`;
+    }
+
+    function escHtml(str) {
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    document.getElementById('txInput').addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') verify();
+    });
+  </script>
+</body>
+</html>

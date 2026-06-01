@@ -1,3 +1,4 @@
+const path = require('path');
 const express = require('express');
 const argon2 = require('argon2');
 const jwt = require('jsonwebtoken');
@@ -6,6 +7,11 @@ const { writeHashToChain } = require('./blockchain');
 
 const app = express();
 app.use(express.json());
+app.use(express.static(path.join(__dirname, '../../public')));
+
+app.get('/verify', (req, res) => {
+  res.sendFile(path.join(__dirname, '../../public/verify.html'));
+});
 
 const JWT_SECRET = 'change-this-to-a-random-string-later';
 
