@@ -1,19 +1,15 @@
 #pragma once
 #include <string>
 #include <memory>
+#include <vector>
 #include "HttpClient.h"
-#include "MessageStore.h"
 
 class Client {
 public:
-    Client(const std::string& serverUrl);
-    bool login(const std::string& username, const std::string& password);
-    bool registerUser(const std::string& username, const std::string& password);
-    bool sendMessage(const std::string& recipient, const std::string& plaintext);
-    void fetchMessages();
+    explicit Client(const std::string& serverUrl);
+    void fetchAndDecryptMessages(const std::vector<unsigned char>& myPrivateKey,
+                                 const std::string& token);
 private:
     std::string serverUrl;
-    std::string jwtToken;
     std::unique_ptr<HttpClient> http;
-    std::unique_ptr<MessageStore> store;
 };
