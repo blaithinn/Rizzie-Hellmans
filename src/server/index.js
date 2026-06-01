@@ -4,8 +4,22 @@ const argon2 = require('argon2');
 const jwt = require('jsonwebtoken');
 const db = require('./database');
 const { writeHashToChain } = require('./blockchain');
+const {
+  validateRegister,
+  validateLogin,
+  validateSendMessage,
+  validateUpdatePublicKey
+} = require('./middleware/validation');
 
 const app = express();
+
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('X-XSS-Protection', '1; mode=block');
+  next();
+});
+
 app.use(express.json());
 app.use(express.static(path.join(__dirname, '../../public')));
 
@@ -37,7 +51,7 @@ app.get('/health', (req, res) => {
 });
 
 // Register
-app.post('/auth/register', async (req, res) => {
+app.post('/auth/register', validateRegister, async (req, res) => {
   const { username, password, publicKey } = req.body;  
   if (!username || !password)
     return res.status(400).json({ error: 'Username and password required' });
@@ -58,7 +72,7 @@ app.post('/auth/register', async (req, res) => {
 });
 
 // Login
-app.post('/auth/login', async (req, res) => {
+app.post('/auth/login', validateLogin, async (req, res) => {
   const { username, password } = req.body;
   const user = db.prepare('SELECT * FROM users WHERE username = ?').get(username);
 
@@ -72,7 +86,7 @@ app.post('/auth/login', async (req, res) => {
 });
 
 // PUT /users/pubkey — publish or update the authenticated user's X25519 public key
-app.put('/users/pubkey', authenticate, (req, res) => {
+app.put('/users/pubkey', authenticate, validateUpdatePublicKey, (req, res) => {
   const { publicKey } = req.body;
   if (!publicKey || typeof publicKey !== 'string')
     return res.status(400).json({ error: 'publicKey is required' });
@@ -92,7 +106,7 @@ app.get('/users/:id/pubkey', authenticate, (req, res) => {
 });
 
 // POST /messages — send an encrypted message to another user
-app.post('/messages', authenticate, async (req, res) => {
+app.post('/messages', authenticate, validateSendMessage, async (req, res) => {
   const { to, enc, ciphertext } = req.body;
 
   if (to == null || !enc || !ciphertext)
