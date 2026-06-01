@@ -154,6 +154,37 @@ app.get('/messages', authenticate, (req, res) => {
   })));
 });
 
+// GET /messages/:id/download — download a message the authenticated user owns or has access to
+app.get('/messages/:id/download', authenticate, (req, res) => {
+  const messageId = parseInt(req.params.id, 10);
+  if (isNaN(messageId) || messageId <= 0)
+    return res.status(400).json({ error: 'Invalid message ID' });
+
+  const message = db.prepare('SELECT * FROM messages WHERE id = ?').get(messageId);
+  if (!message)
+    return res.status(404).json({ error: 'Message not found' });
+
+  const ownsOrIsRecipient =
+    message.sender_id === req.user.id || message.recipient_id === req.user.id;
+
+  if (!ownsOrIsRecipient) {
+    const share = db.prepare(
+      'SELECT 1 FROM message_shares WHERE message_id = ? AND shared_with_user_id = ?'
+    ).get(messageId, req.user.id);
+    if (!share)
+      return res.status(403).json({ error: 'Access denied' });
+  }
+
+  res.json({
+    messageId: message.id,
+    from: message.sender_id,
+    enc: message.enc,
+    ciphertext: message.ciphertext,
+    txHash: message.tx_hash,
+    sentAt: message.sent_at
+  });
+});
+
 // POST /messages/:id/forward — re-encrypt and forward a message to another user
 app.post('/messages/:id/forward', authenticate, validateForwardMessage, async (req, res) => {
   const messageId = parseInt(req.params.id, 10);
