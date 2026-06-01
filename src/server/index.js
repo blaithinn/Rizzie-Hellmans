@@ -2,6 +2,7 @@ const express = require('express');
 const argon2 = require('argon2');
 const jwt = require('jsonwebtoken');
 const db = require('./database');
+const { writeHashToChain } = require('./blockchain');
 
 const app = express();
 app.use(express.json());
@@ -85,7 +86,7 @@ app.get('/users/:id/pubkey', authenticate, (req, res) => {
 });
 
 // POST /messages — send an encrypted message to another user
-app.post('/messages', authenticate, (req, res) => {
+app.post('/messages', authenticate, async (req, res) => {
   const { to, enc, ciphertext } = req.body;
 
   if (to == null || !enc || !ciphertext)
@@ -105,10 +106,7 @@ app.post('/messages', authenticate, (req, res) => {
   if (!recipient)
     return res.status(404).json({ error: 'Recipient not found' });
 
-  // TODO (task 2.5): compute keccak256(enc || ciphertext), call storeHash() on the
-  // Sepolia smart contract (docs/blockchain/contract.json), and store the returned
-  // Ethereum transaction hash in tx_hash.
-  const txHash = null;
+  const txHash = await writeHashToChain(enc, ciphertext);
 
   const sentAt = new Date().toISOString();
   const result = db.prepare(
