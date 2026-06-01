@@ -1,6 +1,8 @@
 #include "CryptoUtils.h"
 #include <sodium.h>
 #include <stdexcept>
+#include <fstream>
+#include <cstring>
 
 void CryptoUtils::generateKeyPair(std::vector<unsigned char>& publicKey,
                                    std::vector<unsigned char>& privateKey) {
@@ -188,4 +190,144 @@ std::vector<unsigned char> CryptoUtils::fromBase64(const std::string& b64) {
     }
     bin.resize(binLen);
     return bin;
+}
+
+// ---------------------------------------------------------------------------
+// Persistent encrypted private-key storage
+// ---------------------------------------------------------------------------
+
+static void deriveAtRestKey(unsigned char outKey[crypto_aead_aes256gcm_KEYBYTES],
+                            const unsigned char salt[crypto_pwhash_SALTBYTES],
+                            const std::string& passphrase)
+{
+    // Step 1: Argon2id password hashing — stretches passphrase into 32-byte IKM.
+    unsigned char ikm[32];
+    if (crypto_pwhash(ikm, sizeof(ikm),
+                      passphrase.c_str(), passphrase.size(),
+                      salt,
+                      crypto_pwhash_OPSLIMIT_INTERACTIVE,
+                      crypto_pwhash_MEMLIMIT_INTERACTIVE,
+                      crypto_pwhash_ALG_ARGON2ID13) != 0) {
+        throw std::runtime_error("crypto_pwhash failed (out of memory?)");
+    }
+
+    // Step 2a: HKDF-SHA256 extract — empty salt (RFC 5869 §2.2: libsodium uses 32 zero bytes).
+    unsigned char prk[crypto_kdf_hkdf_sha256_KEYBYTES];
+    if (crypto_kdf_hkdf_sha256_extract(prk, nullptr, 0, ikm, sizeof(ikm)) != 0) {
+        sodium_memzero(ikm, sizeof(ikm));
+        throw std::runtime_error("HKDF extract failed");
+    }
+    sodium_memzero(ikm, sizeof(ikm));
+
+    // Step 2b: HKDF-SHA256 expand — info binds this key to the at-rest purpose.
+    const char info[] = "rizzie-atrest-key-v1";
+    if (crypto_kdf_hkdf_sha256_expand(outKey, crypto_aead_aes256gcm_KEYBYTES,
+                                       info, std::strlen(info), prk) != 0) {
+        sodium_memzero(prk, sizeof(prk));
+        throw std::runtime_error("HKDF expand failed");
+    }
+    sodium_memzero(prk, sizeof(prk));
+}
+
+void CryptoUtils::savePrivateKey(const std::vector<unsigned char>& privateKey,
+                                  const std::string& passphrase,
+                                  const std::string& filepath)
+{
+    if (sodium_init() < 0) {
+        throw std::runtime_error("Failed to initialise libsodium");
+    }
+    if (!crypto_aead_aes256gcm_is_available()) {
+        throw std::runtime_error("AES-256-GCM is not available on this CPU (no AES-NI)");
+    }
+
+    // --- Step 1: random salt for Argon2id ---
+    unsigned char salt[crypto_pwhash_SALTBYTES]; // 16 bytes
+    randombytes_buf(salt, sizeof(salt));
+
+    // --- Steps 2+3: derive AES key ---
+    unsigned char aesKey[crypto_aead_aes256gcm_KEYBYTES];
+    deriveAtRestKey(aesKey, salt, passphrase);
+
+    // --- Step 4: random nonce ---
+    unsigned char nonce[crypto_aead_aes256gcm_NPUBBYTES]; // 12 bytes
+    randombytes_buf(nonce, sizeof(nonce));
+
+    // --- Step 5: AES-256-GCM encryption ---
+    std::vector<unsigned char> ciphertext(privateKey.size() + crypto_aead_aes256gcm_ABYTES);
+    unsigned long long ciphertextLen = 0;
+    if (crypto_aead_aes256gcm_encrypt(
+            ciphertext.data(), &ciphertextLen,
+            privateKey.data(), privateKey.size(),
+            nullptr, 0,
+            nullptr,
+            nonce, aesKey) != 0) {
+        sodium_memzero(aesKey, sizeof(aesKey));
+        throw std::runtime_error("AES-256-GCM encryption failed");
+    }
+    sodium_memzero(aesKey, sizeof(aesKey));
+    ciphertext.resize(ciphertextLen);
+
+    // --- Step 6: write salt || nonce || ciphertext+tag ---
+    std::ofstream file(filepath, std::ios::binary | std::ios::trunc);
+    if (!file) {
+        throw std::runtime_error("Cannot open key file for writing: " + filepath);
+    }
+    file.write(reinterpret_cast<const char*>(salt),       sizeof(salt));
+    file.write(reinterpret_cast<const char*>(nonce),      sizeof(nonce));
+    file.write(reinterpret_cast<const char*>(ciphertext.data()), static_cast<std::streamsize>(ciphertext.size()));
+    if (!file) {
+        throw std::runtime_error("Failed to write key file: " + filepath);
+    }
+}
+
+std::vector<unsigned char> CryptoUtils::loadPrivateKey(const std::string& passphrase,
+                                                         const std::string& filepath)
+{
+    if (sodium_init() < 0) {
+        throw std::runtime_error("Failed to initialise libsodium");
+    }
+    if (!crypto_aead_aes256gcm_is_available()) {
+        throw std::runtime_error("AES-256-GCM is not available on this CPU (no AES-NI)");
+    }
+
+    // --- Read file ---
+    std::ifstream file(filepath, std::ios::binary);
+    if (!file) {
+        throw std::runtime_error("Cannot open key file: " + filepath);
+    }
+    std::vector<unsigned char> fileData(
+        (std::istreambuf_iterator<char>(file)),
+        std::istreambuf_iterator<char>());
+
+    const size_t headerLen = crypto_pwhash_SALTBYTES + crypto_aead_aes256gcm_NPUBBYTES;
+    if (fileData.size() <= headerLen + crypto_aead_aes256gcm_ABYTES) {
+        throw std::runtime_error("Key file is too short or corrupt: " + filepath);
+    }
+
+    // --- Split into components ---
+    const unsigned char* salt       = fileData.data();
+    const unsigned char* nonce      = fileData.data() + crypto_pwhash_SALTBYTES;
+    const unsigned char* ciphertext = fileData.data() + headerLen;
+    size_t               ciphertextLen = fileData.size() - headerLen;
+
+    // --- Re-derive key (steps 2+3 mirror savePrivateKey) ---
+    unsigned char aesKey[crypto_aead_aes256gcm_KEYBYTES];
+    deriveAtRestKey(aesKey, salt, passphrase);
+
+    // --- AES-256-GCM decryption ---
+    std::vector<unsigned char> privateKey(ciphertextLen - crypto_aead_aes256gcm_ABYTES);
+    unsigned long long plaintextLen = 0;
+    if (crypto_aead_aes256gcm_decrypt(
+            privateKey.data(), &plaintextLen,
+            nullptr,
+            ciphertext, ciphertextLen,
+            nullptr, 0,
+            nonce, aesKey) != 0) {
+        sodium_memzero(aesKey, sizeof(aesKey));
+        throw std::runtime_error("Failed to decrypt key file: wrong passphrase or corrupt file");
+    }
+    sodium_memzero(aesKey, sizeof(aesKey));
+    privateKey.resize(plaintextLen);
+
+    return privateKey;
 }

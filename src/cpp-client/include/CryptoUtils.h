@@ -38,4 +38,25 @@ public:
         const std::vector<unsigned char>& payload,
         const std::vector<unsigned char>& enc,
         const std::vector<unsigned char>& recipientSecretKey);
+
+    // Persistent encrypted private-key storage.
+    //
+    // savePrivateKey encrypts privateKey with a passphrase-derived key and writes a
+    // binary file:  salt (16 B) || nonce (12 B) || ciphertext+tag
+    //
+    // Key derivation:
+    //   1. Argon2id (crypto_pwhash, INTERACTIVE params) stretches the passphrase
+    //      using the random salt to produce a 32-byte intermediate key (IKM).
+    //   2. HKDF-SHA256 (extract + expand, info = "rizzie-atrest-key-v1") derives
+    //      the final AES-256-GCM key from that IKM.
+    //
+    // loadPrivateKey reverses the process exactly.
+    //
+    // Throws std::runtime_error on any failure (bad passphrase, file error, no AES-NI).
+    static void savePrivateKey(const std::vector<unsigned char>& privateKey,
+                               const std::string& passphrase,
+                               const std::string& filepath);
+
+    static std::vector<unsigned char> loadPrivateKey(const std::string& passphrase,
+                                                      const std::string& filepath);
 };
