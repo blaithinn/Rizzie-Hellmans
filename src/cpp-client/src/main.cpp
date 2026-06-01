@@ -8,8 +8,8 @@ int main() {
     std::cout << "SecureChat C++ Client v0.1 — task 2.3 crypto smoke test" << std::endl;
 
     // Generate two key pairs to stand in for Alice (sender) and Bob (recipient).
-    // These are regenerated fresh every run — in production, Alice's keys come from
-    // local storage and Bob's public key comes from the server (task 2.2).
+    // In production, Alice's keys come from local storage and Bob's public key
+    // comes from GET /users/:id/pubkey (task 2.2).
     std::vector<unsigned char> alicePub, aliceSec;
     std::vector<unsigned char> bobPub,   bobSec;
     CryptoUtils::generateKeyPair(alicePub, aliceSec);
@@ -21,12 +21,16 @@ int main() {
     const std::string message = "Hello Bob, this is an authenticated encrypted message!";
     std::cout << "\nPlaintext:  " << message << std::endl;
 
-    // Alice encrypts for Bob, authenticating with her own secret key.
-    auto payload = CryptoUtils::encryptMessage(message, bobPub, aliceSec);
-    std::cout << "Ciphertext (base64): " << CryptoUtils::toBase64(payload) << std::endl;
+    // Alice encrypts for Bob.
+    // encOut = ephemeral public key → goes in the "enc" field of POST /messages.
+    // payload = nonce || ciphertext+tag → goes in the "ciphertext" field.
+    std::vector<unsigned char> encOut;
+    auto payload = CryptoUtils::encryptMessage(message, bobPub, aliceSec, encOut);
+    std::cout << "enc        (base64): " << CryptoUtils::toBase64(encOut)  << std::endl;
+    std::cout << "ciphertext (base64): " << CryptoUtils::toBase64(payload) << std::endl;
 
-    // Bob decrypts, verifying it genuinely came from Alice.
-    std::string decrypted = CryptoUtils::decryptMessage(payload, alicePub, bobSec);
+    // Bob decrypts using the ephemeral public key (enc) and his own secret key.
+    std::string decrypted = CryptoUtils::decryptMessage(payload, encOut, bobSec);
     std::cout << "Decrypted:  " << decrypted << std::endl;
 
     if (decrypted == message) {
