@@ -8,7 +8,8 @@ const {
   validateRegister,
   validateLogin,
   validateSendMessage,
-  validateUpdatePublicKey
+  validateUpdatePublicKey,
+  validateForwardMessage
 } = require('./middleware/validation');
 
 const app = express();
@@ -151,6 +152,77 @@ app.get('/messages', authenticate, (req, res) => {
     txHash: m.tx_hash,
     sentAt: m.sent_at
   })));
+});
+
+// POST /messages/:id/forward — re-encrypt and forward a message to another user
+app.post('/messages/:id/forward', authenticate, validateForwardMessage, async (req, res) => {
+  const messageId = parseInt(req.params.id, 10);
+  if (isNaN(messageId) || messageId <= 0)
+    return res.status(400).json({ error: 'Invalid message ID' });
+
+  const original = db.prepare('SELECT * FROM messages WHERE id = ?').get(messageId);
+  if (!original)
+    return res.status(404).json({ error: 'Message not found' });
+
+  const ownsOrIsRecipient =
+    original.sender_id === req.user.id || original.recipient_id === req.user.id;
+
+  if (!ownsOrIsRecipient) {
+    const share = db.prepare(
+      'SELECT 1 FROM message_shares WHERE message_id = ? AND shared_with_user_id = ?'
+    ).get(messageId, req.user.id);
+    if (!share)
+      return res.status(403).json({ error: 'Access denied' });
+  }
+
+  const { to, enc, ciphertext } = req.body;
+
+  const recipient = db.prepare('SELECT id FROM users WHERE id = ?').get(to);
+  if (!recipient)
+    return res.status(404).json({ error: 'Recipient not found' });
+
+  const txHash = await writeHashToChain(enc, ciphertext);
+
+  const sentAt = new Date().toISOString();
+  const result = db.prepare(
+    'INSERT INTO messages (sender_id, recipient_id, enc, ciphertext, tx_hash, sent_at) VALUES (?, ?, ?, ?, ?, ?)'
+  ).run(req.user.id, to, enc, ciphertext, txHash, sentAt);
+
+  const newMessageId = result.lastInsertRowid;
+
+  db.prepare(
+    'INSERT INTO message_shares (message_id, shared_with_user_id) VALUES (?, ?)'
+  ).run(newMessageId, to);
+
+  res.status(201).json({ messageId: newMessageId, txHash });
+});
+
+// DELETE /messages/:id/share/:uid — revoke a user's access to a shared message
+app.delete('/messages/:id/share/:uid', authenticate, (req, res) => {
+  const messageId = parseInt(req.params.id, 10);
+  const targetUserId = parseInt(req.params.uid, 10);
+
+  if (isNaN(messageId) || messageId <= 0)
+    return res.status(400).json({ error: 'Invalid message ID' });
+  if (isNaN(targetUserId) || targetUserId <= 0)
+    return res.status(400).json({ error: 'Invalid user ID' });
+
+  const message = db.prepare('SELECT * FROM messages WHERE id = ?').get(messageId);
+  if (!message)
+    return res.status(404).json({ error: 'Message not found' });
+
+  if (message.sender_id !== req.user.id)
+    return res.status(403).json({ error: 'Access denied' });
+
+  const targetUser = db.prepare('SELECT id FROM users WHERE id = ?').get(targetUserId);
+  if (!targetUser)
+    return res.status(404).json({ error: 'User not found' });
+
+  db.prepare(
+    'DELETE FROM message_shares WHERE message_id = ? AND shared_with_user_id = ?'
+  ).run(messageId, targetUserId);
+
+  res.json({ message: 'Access revoked' });
 });
 
 app.listen(80, () => {
