@@ -84,6 +84,57 @@ app.get('/users/:id/pubkey', authenticate, (req, res) => {
   res.json({ publicKey: user.public_key });
 });
 
+// POST /messages — send an encrypted message to another user
+app.post('/messages', authenticate, (req, res) => {
+  const { to, enc, ciphertext } = req.body;
+
+  if (to == null || !enc || !ciphertext)
+    return res.status(400).json({ error: 'to, enc, and ciphertext are required' });
+
+  const recipientId = parseInt(to, 10);
+  if (isNaN(recipientId) || recipientId <= 0)
+    return res.status(400).json({ error: 'to must be a valid user ID' });
+
+  if (typeof enc !== 'string' || !BASE64_RE.test(enc) || enc.length % 4 !== 0)
+    return res.status(400).json({ error: 'enc must be a valid base64 string' });
+
+  if (typeof ciphertext !== 'string' || !BASE64_RE.test(ciphertext) || ciphertext.length % 4 !== 0)
+    return res.status(400).json({ error: 'ciphertext must be a valid base64 string' });
+
+  const recipient = db.prepare('SELECT id FROM users WHERE id = ?').get(recipientId);
+  if (!recipient)
+    return res.status(404).json({ error: 'Recipient not found' });
+
+  // TODO (task 2.5): compute keccak256(enc || ciphertext), call storeHash() on the
+  // Sepolia smart contract (docs/blockchain/contract.json), and store the returned
+  // Ethereum transaction hash in tx_hash.
+  const txHash = null;
+
+  const sentAt = new Date().toISOString();
+  const result = db.prepare(
+    'INSERT INTO messages (sender_id, recipient_id, enc, ciphertext, tx_hash, sent_at) VALUES (?, ?, ?, ?, ?, ?)'
+  ).run(req.user.id, recipientId, enc, ciphertext, txHash, sentAt);
+
+  res.status(201).json({ messageId: result.lastInsertRowid, txHash });
+});
+
+// GET /messages — retrieve all inbox and sent messages for the authenticated user
+app.get('/messages', authenticate, (req, res) => {
+  const rows = db.prepare(
+    'SELECT * FROM messages WHERE sender_id = ? OR recipient_id = ?'
+  ).all(req.user.id, req.user.id);
+
+  res.json(rows.map(m => ({
+    messageId: m.id,
+    from: m.sender_id,
+    to: m.recipient_id,
+    enc: m.enc,
+    ciphertext: m.ciphertext,
+    txHash: m.tx_hash,
+    sentAt: m.sent_at
+  })));
+});
+
 app.listen(80, () => {
   console.log('Server running on port 80');
 });

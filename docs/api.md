@@ -40,7 +40,7 @@ Register a new user. Stores an Argon2id hash of the password and the user's publ
 **Response `201 Created`:**
 ```json
 {
-  "userId": "uuid-string"
+  "userId": 1
 }
 ```
 
@@ -172,7 +172,7 @@ On receipt, the server computes `keccak256(enc || ciphertext)`, writes it to the
 **Response `201 Created`:**
 ```json
 {
-  "messageId": "uuid-string",
+  "messageId": 1,
   "txHash": "<Ethereum transaction hash>"
 }
 ```
@@ -194,9 +194,9 @@ List all inbox and sent messages for the authenticated user. Returns metadata an
 ```json
 [
   {
-    "messageId": "uuid-string",
-    "from": "sender-user-id",
-    "to": "recipient-user-id",
+    "messageId": 1,
+    "from": 1,
+    "to": 2,
     "enc": "<base64>",
     "ciphertext": "<base64>",
     "txHash": "<Ethereum transaction hash>",
@@ -233,8 +233,8 @@ Download a message the authenticated user owns or has been granted access to.
 **Response `200 OK`:**
 ```json
 {
-  "messageId": "uuid-string",
-  "from": "sender-user-id",
+  "messageId": 1,
+  "from": 1,
   "enc": "<base64>",
   "ciphertext": "<base64>",
   "txHash": "<Ethereum transaction hash>",
@@ -267,7 +267,7 @@ Re-encrypt and forward a message to another user. The client must verify the rec
 **Response `201 Created`:**
 ```json
 {
-  "messageId": "uuid-string",
+  "messageId": 1,
   "txHash": "<Ethereum transaction hash>"
 }
 ```
