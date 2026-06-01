@@ -5,5 +5,5 @@ class HttpClient {
 public:
     HttpClient();
     ~HttpClient();
-    std::string get(const std::string& url);
+    std::string get(const std::string& url, const std::string& token = "");
 };

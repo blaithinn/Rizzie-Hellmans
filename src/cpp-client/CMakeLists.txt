@@ -15,6 +15,7 @@ include_directories(include ${SODIUM_INCLUDE})
 
 add_executable(client
     src/main.cpp
+    src/Client.cpp
     src/HttpClient.cpp
     src/CryptoUtils.cpp
 )
