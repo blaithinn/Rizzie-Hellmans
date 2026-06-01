@@ -29,7 +29,11 @@ app.get('/verify', (req, res) => {
   res.sendFile(path.join(__dirname, '../../public/verify.html'));
 });
 
-const JWT_SECRET = 'change-this-to-a-random-string-later';
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+  console.error('FATAL: JWT_SECRET environment variable is not set');
+  process.exit(1);
+}
 
 // Standard base64 (RFC 4648) — matches sodium_base64_VARIANT_ORIGINAL used by CryptoUtils
 const BASE64_RE = /^[A-Za-z0-9+/]+={0,2}$/;
