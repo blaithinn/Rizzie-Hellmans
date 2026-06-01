@@ -22,4 +22,14 @@ db.exec(`
   )
 `);
 
+db.exec(`
+  CREATE TABLE IF NOT EXISTS message_shares (
+    message_id INTEGER NOT NULL,
+    shared_with_user_id INTEGER NOT NULL,
+    PRIMARY KEY (message_id, shared_with_user_id),
+    FOREIGN KEY (message_id) REFERENCES messages(id),
+    FOREIGN KEY (shared_with_user_id) REFERENCES users(id)
+  )
+`);
+
 module.exports = db;
