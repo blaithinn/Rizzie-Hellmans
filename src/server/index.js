@@ -7,6 +7,7 @@ const { writeHashToChain } = require('./blockchain');
 const {
   validateRegister,
   validateLogin,
+  validateChangePassword,
   validateSendMessage,
   validateUpdatePublicKey,
   validateForwardMessage
@@ -41,10 +42,15 @@ const authenticate = (req, res, next) => {
   const token = authHeader.slice(7);
   try {
     req.user = jwt.verify(token, JWT_SECRET);
-    next();
   } catch (err) {
     return res.status(401).json({ error: 'Invalid or expired token' });
   }
+
+  const user = db.prepare('SELECT token_version FROM users WHERE id = ?').get(req.user.id);
+  if (!user || user.token_version !== req.user.tokenVersion)
+    return res.status(401).json({ error: 'Session expired, please log in again' });
+
+  next();
 };
 
 app.get('/health', (req, res) => {
@@ -82,7 +88,7 @@ app.post('/auth/login', validateLogin, async (req, res) => {
   const match = await argon2.verify(user.password_hash, password);
   if (!match) return res.status(401).json({ error: 'Invalid credentials' });
 
-  const token = jwt.sign({ id: user.id, username: user.username }, JWT_SECRET, { expiresIn: '24h' });
+  const token = jwt.sign({ id: user.id, username: user.username, tokenVersion: user.token_version }, JWT_SECRET, { expiresIn: '24h' });
   res.json({ token });
 });
 
@@ -226,6 +232,28 @@ app.post('/messages/:id/forward', authenticate, validateForwardMessage, async (r
   ).run(newMessageId, to);
 
   res.status(201).json({ messageId: newMessageId, txHash });
+});
+
+// PUT /auth/password — change the authenticated user's password
+app.put('/auth/password', authenticate, validateChangePassword, async (req, res) => {
+  const { currentPassword, newPassword } = req.body;
+
+  const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.user.id);
+  if (!user) return res.status(404).json({ error: 'User not found' });
+
+  const match = await argon2.verify(user.password_hash, currentPassword);
+  if (!match) return res.status(401).json({ error: 'Current password is incorrect' });
+
+  const newHash = await argon2.hash(newPassword, {
+    type: argon2.argon2id,
+    memoryCost: 65536,
+    timeCost: 3,
+    parallelism: 4
+  });
+
+  db.prepare('UPDATE users SET password_hash = ?, token_version = token_version + 1 WHERE id = ?').run(newHash, user.id);
+
+  res.json({ message: 'Password updated successfully' });
 });
 
 // DELETE /messages/:id/share/:uid — revoke a user's access to a shared message

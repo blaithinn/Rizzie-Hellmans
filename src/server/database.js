@@ -32,4 +32,10 @@ db.exec(`
   )
 `);
 
+try {
+  db.exec('ALTER TABLE users ADD COLUMN token_version INTEGER NOT NULL DEFAULT 0');
+} catch (err) {
+  // Column already exists — safe to ignore on restart
+}
+
 module.exports = db;
