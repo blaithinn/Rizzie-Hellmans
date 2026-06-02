@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Rizz Me Through The Phone 💘 — secure DMs</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800;900&family=Space+Mono&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/rizz.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💘</text></svg>">
+</head>
+<body>
+  <div id="demoBanner" class="hidden">💘 Demo Mode — running on an in-browser mock backend (no server needed). Real crypto, fake data.</div>
+
+  <!-- ============================ AUTH ============================ -->
+  <section id="authScreen" data-screen-label="Auth / Login">
+    <div class="auth-card">
+      <div class="brand">
+        <div class="logo-emoji">💘📱</div>
+        <h1>Rizz Me Through<br>The Phone</h1>
+        <div class="tagline">end-to-end encrypted rizz · certified on-chain 🔥</div>
+      </div>
+
+      <div class="auth-tabs">
+        <button class="auth-tab active" data-mode="login" type="button">Log In</button>
+        <button class="auth-tab" data-mode="signup" type="button">Sign Up</button>
+      </div>
+
+      <form id="loginForm" autocomplete="off">
+        <div class="rizz-field">
+          <label for="loginUser">Username</label>
+          <input class="rizz-input" id="loginUser" placeholder="your_rizz_handle" autocomplete="username">
+        </div>
+        <div class="rizz-field">
+          <label for="loginPass">Password</label>
+          <input class="rizz-input" id="loginPass" type="password" placeholder="••••••••" autocomplete="current-password">
+        </div>
+        <button class="rizz-btn" type="submit" style="width:100%">Enter The Rizzosphere 💘</button>
+      </form>
+
+      <form id="signupForm" class="hidden" autocomplete="off">
+        <div class="rizz-field">
+          <label for="suUser">Username</label>
+          <input class="rizz-input" id="suUser" placeholder="letters, numbers, _ (3–30)" autocomplete="username">
+        </div>
+        <div class="rizz-field">
+          <label for="suPass">Password</label>
+          <input class="rizz-input" id="suPass" type="password" placeholder="at least 8 characters" autocomplete="new-password">
+        </div>
+        <div class="rizz-field">
+          <label for="suConfirm">Confirm password</label>
+          <input class="rizz-input" id="suConfirm" type="password" placeholder="say it again" autocomplete="new-password">
+        </div>
+        <button class="rizz-btn" type="submit" style="width:100%">Enter The Rizzosphere 💘</button>
+      </form>
+
+      <div class="auth-msg" id="authMsg"></div>
+      <div class="auth-foot">
+        🔐 Your secret key is generated in this browser and never leaves it.<br>
+        Got a transaction hash? <a href="verify.html" target="_blank">Verify a rizz →</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================ APP ============================ -->
+  <section id="appScreen" class="hidden" data-screen-label="Messenger">
+    <header class="app-topbar">
+      <button class="icon-btn hidden" id="backBtn" title="Back" style="margin-right:-4px">‹</button>
+      <span class="tb-logo">💘📱</span>
+      <span class="tb-title">Rizz Me Through The Phone</span>
+      <span class="tb-spacer"></span>
+      <span class="tb-me">
+        <span><span class="who" id="tbWho">—</span><br><span class="uid" id="tbUid"></span></span>
+      </span>
+      <button class="icon-btn" id="settingsBtn" title="Settings">⚙️</button>
+    </header>
+
+    <div class="app-body">
+      <aside class="sidebar">
+        <div class="sidebar-head">
+          <div class="sh-title">💞 Potential Rizzipients</div>
+          <div class="sh-sub">your end-to-end encrypted shortlist</div>
+        </div>
+        <div class="sidebar-actions">
+          <input class="rizz-input" id="searchBox" placeholder="Search rizzipients…">
+          <button class="rizz-btn sm" id="newRizzBtn" title="Start a new rizz" style="white-space:nowrap">＋ New</button>
+        </div>
+        <div class="rizz-list" id="rizzList"></div>
+      </aside>
+
+      <main class="chat" id="chatPane"></main>
+    </div>
+  </section>
+
+  <div id="modalRoot"></div>
+  <div id="toastWrap"></div>
+
+  <!-- tweetnacl: X25519 scalarmult + keypairs, matching libsodium crypto_box -->
+  <script src="https://cdn.jsdelivr.net/npm/tweetnacl@1.0.3/nacl.min.js"></script>
+  <script src="js/crypto.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/demo.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

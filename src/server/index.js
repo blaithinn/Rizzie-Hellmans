@@ -265,6 +265,26 @@ app.put('/auth/password', authenticate, validateChangePassword, async (req, res)
   res.json({ message: 'Password updated successfully' });
 });
 
+// DELETE /messages/:id — delete a message (sender only, hard delete)
+app.delete('/messages/:id', authenticate, (req, res) => {
+  const messageId = parseInt(req.params.id, 10);
+
+  if (isNaN(messageId) || messageId <= 0)
+    return res.status(400).json({ error: 'Invalid message ID' });
+
+  const message = db.prepare('SELECT * FROM messages WHERE id = ?').get(messageId);
+  if (!message)
+    return res.status(404).json({ error: 'Message not found' });
+
+  if (message.sender_id !== req.user.id)
+    return res.status(403).json({ error: 'Access denied' });
+
+  db.prepare('DELETE FROM message_shares WHERE message_id = ?').run(messageId);
+  db.prepare('DELETE FROM messages WHERE id = ?').run(messageId);
+
+  res.json({ message: 'Message deleted' });
+});
+
 // DELETE /messages/:id/share/:uid — revoke a user's access to a shared message
 app.delete('/messages/:id/share/:uid', authenticate, (req, res) => {
   const messageId = parseInt(req.params.id, 10);
