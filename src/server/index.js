@@ -79,7 +79,11 @@ app.post('/auth/register', validateRegister, async (req, res) => {
     db.prepare('INSERT INTO users (username, password_hash, public_key) VALUES (?, ?, ?)').run(username, hash, publicKey || null);
     res.status(201).json({ message: 'User registered successfully' });
   } catch (err) {
-    res.status(409).json({ error: 'Username already taken' });
+    if (err.code === 'SQLITE_CONSTRAINT_UNIQUE' || err.code === 'SQLITE_CONSTRAINT') {
+      return res.status(409).json({ error: 'Username already taken' });
+    }
+    console.error('Registration error:', err);
+    res.status(500).json({ error: 'Registration failed due to a server error' });
   }
 });
 
