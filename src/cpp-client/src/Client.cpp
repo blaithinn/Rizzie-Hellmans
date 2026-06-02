@@ -1,9 +1,12 @@
 #include "Client.h"
 #include "CryptoUtils.h"
 #include "Message.h"
+#include "Conversation.h"
 #include <cstdlib>
 #include <iostream>
 #include <algorithm>
+#include <map>
+#include <set>
 #include <stdexcept>
 
 static std::string defaultKeyStorePath() {
@@ -61,6 +64,33 @@ static std::vector<std::string> splitJsonArray(const std::string& json) {
     return objects;
 }
 
+// Escape a string for safe embedding inside a JSON double-quoted value.
+// Handles backslash and double-quote (the two characters that break JSON string
+// literals when built by concatenation), plus common control characters.
+static std::string jsonEscape(const std::string& s) {
+    std::string out;
+    out.reserve(s.size());
+    for (unsigned char c : s) {
+        switch (c) {
+        case '\\': out += "\\\\"; break;
+        case '"':  out += "\\\""; break;
+        case '\n': out += "\\n";  break;
+        case '\r': out += "\\r";  break;
+        case '\t': out += "\\t";  break;
+        default:
+            if (c < 0x20) {
+                // Other control characters as \uXXXX
+                char buf[7];
+                std::snprintf(buf, sizeof(buf), "\\u%04x", c);
+                out += buf;
+            } else {
+                out += static_cast<char>(c);
+            }
+        }
+    }
+    return out;
+}
+
 // Convert base64url to base64 and decode to a UTF-8 string (for JWT payload).
 static std::string decodeBase64Url(const std::string& input) {
     std::string b64 = input;
@@ -87,13 +117,13 @@ void Client::setKeyPair(const std::vector<unsigned char>& publicKey,
 
 bool Client::registerUser(const std::string& username, const std::string& password) {
     std::string url  = serverUrl + "/auth/register";
-    std::string body = "{\"username\":\"" + username +
-                       "\",\"password\":\"" + password +
+    std::string body = "{\"username\":\"" + jsonEscape(username) +
+                       "\",\"password\":\"" + jsonEscape(password) +
                        "\",\"publicKey\":\"" + publicKeyB64 + "\"}";
 
     std::string response = http->post(url, body);
 
-    if (response.find("\"message\"") == std::string::npos) {
+    if (response.find("\"userId\"") == std::string::npos) {
         std::cerr << "Registration failed: " << response << "\n";
         return false;
     }
@@ -102,27 +132,43 @@ bool Client::registerUser(const std::string& username, const std::string& passwo
 }
 
 bool Client::login(const std::string& username, const std::string& password) {
-    std::string body = "{\"username\":\"" + username +
-                       "\",\"password\":\"" + password + "\"}";
+    std::string body = "{\"username\":\"" + jsonEscape(username) +
+                       "\",\"password\":\"" + jsonEscape(password) + "\"}";
     std::string response = http->post(serverUrl + "/auth/login", body);
     token = extractField(response, "token");
     if (token.empty()) {
         std::cerr << "Login failed: " << response << "\n";
         return false;
     }
-    // Decode JWT payload (base64url middle section) to extract integer user id
+    // Decode JWT payload to extract integer user id
     auto dot1 = token.find('.');
     auto dot2 = token.find('.', dot1 + 1);
     if (dot1 != std::string::npos && dot2 != std::string::npos) {
         std::string payload = decodeBase64Url(token.substr(dot1 + 1, dot2 - dot1 - 1));
         userId = extractIntField(payload, "id");
     }
-    std::cout << "Logged in as " << username << " (userId=" << userId << ").\n";
+    currentUser_ = std::make_unique<User>(username, publicKeyB64);
+    std::cout << "Logged in as " << currentUser_->getUsername()
+              << " (userId=" << userId << ").\n";
+    return true;
+}
+
+bool Client::changePassword(const std::string& currentPassword, const std::string& newPassword) {
+    std::string body = "{\"currentPassword\":\"" + jsonEscape(currentPassword) +
+                       "\",\"newPassword\":\"" + jsonEscape(newPassword) + "\"}";
+    std::string response = http->put(serverUrl + "/auth/password", body, token);
+    if (response.find("\"message\"") == std::string::npos) {
+        std::cerr << "Password change failed: " << response << "\n";
+        return false;
+    }
+    std::cout << "Password updated. Please log in again.\n";
+    token.clear();
+    currentUser_.reset();
     return true;
 }
 
 void Client::sendMessage(int recipientUserId, const std::string& plaintext) {
-    std::string pubkeyUrl = serverUrl + "/users/" + std::to_string(recipientUserId) + "/pubkey";
+    std::string pubkeyUrl  = serverUrl + "/users/" + std::to_string(recipientUserId) + "/pubkey";
     std::string pubkeyResp = http->get(pubkeyUrl, token);
     std::string recipPubKeyB64 = extractField(pubkeyResp, "publicKey");
     if (recipPubKeyB64.empty()) {
@@ -140,14 +186,10 @@ void Client::sendMessage(int recipientUserId, const std::string& plaintext) {
     std::vector<unsigned char> encOut;
     auto payload = CryptoUtils::encryptMessage(plaintext, recipPubKey, myPrivateKey, encOut);
 
-    std::string encB64        = CryptoUtils::toBase64(encOut);
-    std::string ciphertextB64 = CryptoUtils::toBase64(payload);
-
-    std::string url  = serverUrl + "/messages";
     std::string body = "{\"to\":" + std::to_string(recipientUserId) +
-                       ",\"enc\":\"" + encB64 +
-                       "\",\"ciphertext\":\"" + ciphertextB64 + "\"}";
-    std::string response = http->post(url, body, token);
+                       ",\"enc\":\"" + CryptoUtils::toBase64(encOut) +
+                       "\",\"ciphertext\":\"" + CryptoUtils::toBase64(payload) + "\"}";
+    std::string response = http->post(serverUrl + "/messages", body, token);  // enc/ct are base64 — no escaping needed
     std::cout << "Message sent. Server: " << response << "\n";
 }
 
@@ -185,47 +227,155 @@ void Client::forwardMessage(const std::string& messageId, int recipientUserId) {
 
 void Client::fetchAndDecryptMessages() {
     std::string response = http->get(serverUrl + "/messages", token);
+    auto objects = splitJsonArray(response);
 
-    std::vector<Message> msgs;
-    for (const auto& obj : splitJsonArray(response)) {
-        std::string id         = std::to_string(extractIntField(obj, "messageId"));
-        std::string from       = std::to_string(extractIntField(obj, "from"));
-        std::string enc        = extractField(obj, "enc");
-        std::string ciphertext = extractField(obj, "ciphertext");
-        std::string sentAt     = extractField(obj, "sentAt");
-
-        try {
-            auto encBytes         = CryptoUtils::fromBase64(enc);
-            auto ciphertextBytes  = CryptoUtils::fromBase64(ciphertext);
-            std::string plaintext = CryptoUtils::decryptMessage(ciphertextBytes, encBytes, myPrivateKey);
-            msgs.emplace_back(id, from, "", enc, ciphertext, plaintext, "", sentAt);
-        } catch (const std::exception& e) {
-            std::cerr << "Could not decrypt message from " << from << ": " << e.what() << "\n";
-        }
-    }
-
-    std::sort(msgs.begin(), msgs.end(),
-        [](const Message& a, const Message& b) { return a.getSentAt() < b.getSentAt(); });
-
-    store = std::make_unique<MessageStore>();
-    for (const auto& m : msgs)
-        store->addMessage(m);
-
-    if (msgs.empty()) {
+    if (objects.empty()) {
         std::cout << "No messages.\n";
         return;
     }
-    for (const auto& m : store->getAllMessages()) {
-        std::cout << "ID: " << m.getId() << "  From: " << m.getSender()
-                  << "  [" << m.getSentAt() << "]\n"
-                  << "  " << m.getPlaintext() << "\n\n";
+
+    // Build a list of sender IDs to count sent vs received with std::count
+    std::vector<std::string> fromList;
+    fromList.reserve(objects.size());
+    for (const auto& obj : objects)
+        fromList.push_back(std::to_string(extractIntField(obj, "from")));
+
+    int sentCount     = static_cast<int>(
+        std::count(fromList.begin(), fromList.end(), std::to_string(userId)));
+    int receivedCount = static_cast<int>(objects.size()) - sentCount;
+
+    // Collect unique conversation partners with std::set (sorted, deduplicated)
+    std::set<std::string> partners;
+    for (size_t i = 0; i < objects.size(); ++i) {
+        const std::string& from = fromList[i];
+        std::string to = std::to_string(extractIntField(objects[i], "to"));
+        partners.insert(from == std::to_string(userId) ? to : from);
+    }
+
+    std::cout << objects.size() << " message(s): "
+              << receivedCount << " received, "
+              << sentCount     << " sent across "
+              << partners.size() << " conversation(s).\n\n";
+
+    // Pre-fetch public keys for every unique sender so decryptMessage can verify sender identity
+    std::map<std::string, std::vector<unsigned char>> senderPubKeys;
+    for (size_t i = 0; i < objects.size(); ++i) {
+        const std::string& from = fromList[i];
+        if (from != std::to_string(userId) && !senderPubKeys.count(from)) {
+            std::string pkResp = http->get(serverUrl + "/users/" + from + "/pubkey", token);
+            std::string pkB64  = extractField(pkResp, "publicKey");
+            if (!pkB64.empty())
+                senderPubKeys[from] = CryptoUtils::fromBase64(pkB64);
+        }
+    }
+
+    // Group into conversations by partner using std::map (sorted by partner ID)
+    std::map<std::string, Conversation> conversations;
+    store = std::make_unique<MessageStore>();
+
+    for (const auto& obj : objects) {
+        std::string id      = std::to_string(extractIntField(obj, "messageId"));
+        std::string from    = std::to_string(extractIntField(obj, "from"));
+        std::string to      = std::to_string(extractIntField(obj, "to"));
+        std::string enc     = extractField(obj, "enc");
+        std::string ct      = extractField(obj, "ciphertext");
+        std::string sentAt  = extractField(obj, "sentAt");
+        std::string txHash  = extractField(obj, "txHash");
+        std::string partner = (from == std::to_string(userId)) ? to : from;
+
+        std::string plaintext;
+        if (from == std::to_string(userId)) {
+            plaintext = "[sent — encrypted to recipient]";
+        } else {
+            try {
+                auto encBytes = CryptoUtils::fromBase64(enc);
+                auto ctBytes  = CryptoUtils::fromBase64(ct);
+                auto pkIt = senderPubKeys.find(from);
+                if (pkIt == senderPubKeys.end())
+                    plaintext = "[decryption failed: sender public key unavailable]";
+                else
+                    plaintext = CryptoUtils::decryptMessage(ctBytes, encBytes, myPrivateKey, pkIt->second);
+            } catch (const std::exception& e) {
+                plaintext = std::string("[decryption failed: ") + e.what() + "]";
+            }
+        }
+
+        Message msg(id, from, to, enc, ct, plaintext, txHash, sentAt);
+        store->addMessage(msg);
+
+        // try_emplace constructs Conversation only if the key is new
+        conversations.try_emplace(partner, std::to_string(userId), partner);
+        conversations.at(partner).addMessage(msg);
+    }
+
+    // Display each conversation — copy messages into a sortable vector, then sort by time
+    for (auto& [partner, conv] : conversations) {
+        std::cout << "=== Conversation with user " << partner << " ===\n";
+
+        std::vector<Message> display;
+        display.reserve(conv.getMessages().size());
+        std::copy(conv.getMessages().begin(), conv.getMessages().end(),
+                  std::back_inserter(display));
+        std::sort(display.begin(), display.end(),
+            [](const Message& a, const Message& b) { return a.getSentAt() < b.getSentAt(); });
+
+        for (const auto& m : display) {
+            const char* dir = (m.getSender() == std::to_string(userId)) ? "->" : "<-";
+            std::cout << dir << " [" << m.getSentAt() << "] (id:" << m.getId() << ") "
+                      << m.getPlaintext() << "\n";
+        }
+        std::cout << "\n";
     }
 }
 
-void Client::deleteMessage(const std::string& messageId) {
-    // DELETE /messages/:id not yet implemented on server
-    std::cout << "Delete not yet implemented on server (id=" << messageId << ").\n";
+void Client::downloadMessage(const std::string& messageId) {
+    std::string response = http->get(serverUrl + "/messages/" + messageId + "/download", token);
+
+    std::string enc    = extractField(response, "enc");
+    std::string ct     = extractField(response, "ciphertext");
+    std::string txHash = extractField(response, "txHash");
+    std::string sentAt = extractField(response, "sentAt");
+    std::string from   = std::to_string(extractIntField(response, "from"));
+
+    if (enc.empty() || ct.empty()) {
+        std::cerr << "Download failed: " << response << "\n";
+        return;
+    }
+
+    std::cout << "Message " << messageId << "  from:" << from << "  [" << sentAt << "]\n";
+    std::cout << "txHash: " << txHash << "\n";
+
+    if (from == std::to_string(userId)) {
+        std::cout << "Content: [sent message — encrypted to recipient, cannot decrypt]\n";
+        return;
+    }
+
+    std::string pkResp = http->get(serverUrl + "/users/" + from + "/pubkey", token);
+    std::string pkB64  = extractField(pkResp, "publicKey");
+
+    try {
+        if (pkB64.empty()) throw std::runtime_error("sender public key unavailable");
+        auto encBytes = CryptoUtils::fromBase64(enc);
+        auto ctBytes  = CryptoUtils::fromBase64(ct);
+        auto senderPk = CryptoUtils::fromBase64(pkB64);
+        std::string plaintext = CryptoUtils::decryptMessage(ctBytes, encBytes, myPrivateKey, senderPk);
+        std::cout << "Content: " << plaintext << "\n";
+    } catch (...) {
+        std::cout << "Content: [cannot decrypt — key mismatch]\n";
+    }
 }
 
-bool Client::isLoggedIn() const { return !token.empty(); }
+void Client::revokeAccess(const std::string& messageId, int targetUserId) {
+    std::string url = serverUrl + "/messages/" + messageId +
+                      "/share/" + std::to_string(targetUserId);
+    std::string response = http->del(url, token);
+    std::cout << "Server: " << response << "\n";
+}
+
+void Client::deleteMessage(const std::string& messageId) {
+    std::string response = http->del(serverUrl + "/messages/" + messageId, token);
+    std::cout << "Server: " << response << "\n";
+}
+
+bool Client::isLoggedIn() const { return currentUser_ != nullptr; }
 int  Client::getUserId()  const { return userId; }
