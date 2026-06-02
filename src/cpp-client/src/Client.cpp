@@ -80,10 +80,13 @@ void Client::setKeyPair(const std::vector<unsigned char>& publicKey,
 }
 
 bool Client::registerUser(const std::string& username, const std::string& password) {
+    std::string url  = serverUrl + "/auth/register";
     std::string body = "{\"username\":\"" + username +
                        "\",\"password\":\"" + password +
                        "\",\"publicKey\":\"" + publicKeyB64 + "\"}";
-    std::string response = http->post(serverUrl + "/auth/register", body);
+
+    std::string response = http->post(url, body);
+
     if (response.find("\"message\"") == std::string::npos) {
         std::cerr << "Registration failed: " << response << "\n";
         return false;
