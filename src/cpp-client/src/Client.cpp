@@ -151,6 +151,38 @@ void Client::sendMessage(int recipientUserId, const std::string& plaintext) {
     std::cout << "Message sent. Server: " << response << "\n";
 }
 
+void Client::forwardMessage(const std::string& messageId, int recipientUserId) {
+    const Message* msg = store->findById(messageId);
+    if (!msg) {
+        std::cerr << "Message " << messageId << " not found locally — view inbox first.\n";
+        return;
+    }
+
+    std::string pubkeyResp = http->get(
+        serverUrl + "/users/" + std::to_string(recipientUserId) + "/pubkey", token);
+    std::string recipPubKeyB64 = extractField(pubkeyResp, "publicKey");
+    if (recipPubKeyB64.empty()) {
+        std::cerr << "Could not fetch recipient public key: " << pubkeyResp << "\n";
+        return;
+    }
+
+    if (!keyStore_.verifyAndPin(std::to_string(recipientUserId), recipPubKeyB64)) {
+        std::cerr << "Aborted: key verification failed for user " << recipientUserId << "\n";
+        return;
+    }
+
+    auto recipPubKey = CryptoUtils::fromBase64(recipPubKeyB64);
+    std::vector<unsigned char> encOut;
+    auto payload = CryptoUtils::encryptMessage(msg->getPlaintext(), recipPubKey, myPrivateKey, encOut);
+
+    std::string body = "{\"to\":" + std::to_string(recipientUserId) +
+                       ",\"enc\":\"" + CryptoUtils::toBase64(encOut) +
+                       "\",\"ciphertext\":\"" + CryptoUtils::toBase64(payload) + "\"}";
+    std::string fwdResponse = http->post(
+        serverUrl + "/messages/" + messageId + "/forward", body, token);
+    std::cout << "Message forwarded. Server: " << fwdResponse << "\n";
+}
+
 void Client::fetchAndDecryptMessages() {
     std::string response = http->get(serverUrl + "/messages", token);
 
@@ -184,7 +216,8 @@ void Client::fetchAndDecryptMessages() {
         return;
     }
     for (const auto& m : store->getAllMessages()) {
-        std::cout << "From: " << m.getSender() << "  [" << m.getSentAt() << "]\n"
+        std::cout << "ID: " << m.getId() << "  From: " << m.getSender()
+                  << "  [" << m.getSentAt() << "]\n"
                   << "  " << m.getPlaintext() << "\n\n";
     }
 }
