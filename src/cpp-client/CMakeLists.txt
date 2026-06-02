@@ -18,6 +18,7 @@ add_executable(client
     src/Client.cpp
     src/HttpClient.cpp
     src/CryptoUtils.cpp
+    src/MessageStore.cpp
 )
 
 target_link_libraries(client CURL::libcurl ${SODIUM_LIB})
