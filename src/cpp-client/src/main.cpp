@@ -66,7 +66,8 @@ int main() {
                      "2. Login\n"
                      "3. Send message\n"
                      "4. View inbox\n"
-                     "5. Quit\n"
+                     "5. Forward message\n"
+                     "6. Quit\n"
                      "Choice: ";
 
         std::string line;
@@ -120,11 +121,28 @@ int main() {
             client.fetchAndDecryptMessages();
             break;
         }
-        case 5:
+        case 5: {
+            if (!client.isLoggedIn()) {
+                std::cout << "Please login first.\n";
+                break;
+            }
+            std::string msgId, recipStr;
+            std::cout << "Message ID to forward: ";
+            std::getline(std::cin, msgId);
+            std::cout << "Recipient user ID: ";
+            std::getline(std::cin, recipStr);
+            try {
+                client.forwardMessage(msgId, std::stoi(recipStr));
+            } catch (...) {
+                std::cerr << "Invalid recipient ID.\n";
+            }
+            break;
+        }
+        case 6:
             std::cout << "Goodbye.\n";
             return 0;
         default:
-            std::cout << "Invalid choice, enter 1-5.\n";
+            std::cout << "Invalid choice, enter 1-6.\n";
             break;
         }
     }

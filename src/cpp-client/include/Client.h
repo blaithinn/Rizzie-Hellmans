@@ -16,6 +16,7 @@ public:
     bool registerUser(const std::string& username, const std::string& password);
     bool login(const std::string& username, const std::string& password);
     void sendMessage(int recipientUserId, const std::string& plaintext);
+    void forwardMessage(const std::string& messageId, int recipientUserId);
     void fetchAndDecryptMessages();
     void deleteMessage(const std::string& messageId);
 
