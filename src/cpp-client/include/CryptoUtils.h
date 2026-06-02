@@ -13,16 +13,20 @@ public:
     static std::string toBase64(const std::vector<unsigned char>& data);
     static std::vector<unsigned char> fromBase64(const std::string& b64);
 
-    // Authenticated encryption — HPKE-style ephemeral sender.
-    // Construction: ephemeral X25519 DH → HKDF-SHA256 → AES-256-GCM.
+    // Authenticated encryption — HPKE Mode_Auth equivalent.
+    // Construction: (eph X25519 DH || static X25519 DH) → HKDF-SHA256 → AES-256-GCM.
     //
-    // A fresh ephemeral key pair is generated per message.  The ephemeral
-    // private key drives the X25519 DH with the recipient's static public key.
-    // The ephemeral public key is written to encOut and must be transmitted
-    // alongside the ciphertext so the recipient can reproduce the same shared
-    // secret (matches Bláithín's API: separate "enc" and "ciphertext" fields).
+    // Two DH operations are combined as the HKDF input:
+    //   eph_dh   = X25519(eph_sk,    recipient_pk)   — fresh per message
+    //   static_dh = X25519(sender_sk, recipient_pk)   — binds sender identity
+    // HKDF extract runs over eph_dh || static_dh, so decryption requires knowledge
+    // of both the ephemeral private key (held by sender) and the sender's static
+    // private key.  A recipient verifying with the wrong senderPublicKey gets a
+    // different shared secret and the AES-GCM tag fails — forged messages are
+    // detected.
     //
-    // senderSecretKey is kept for interface symmetry; DH uses the ephemeral key.
+    // The ephemeral public key is written to encOut and transmitted as the API
+    // "enc" field so the recipient can reproduce the same shared secret.
     //
     // Return value layout: nonce (12 bytes) || ciphertext+tag (plaintext.size() + 16 bytes)
     static std::vector<unsigned char> encryptMessage(
@@ -32,12 +36,16 @@ public:
         std::vector<unsigned char>& encOut);
 
     // Decrypts a payload produced by encryptMessage.
-    // enc is the ephemeral public key from the "enc" field of the API response.
-    // Throws std::runtime_error on wrong keys or any tampering (AES-GCM tag mismatch).
+    // enc is the ephemeral public key from the "enc" API field.
+    // senderPublicKey is the sender's registered static X25519 public key —
+    // decryption fails (AES-GCM tag mismatch) if it does not match the key used
+    // during encryption, proving the message came from that specific sender.
+    // Throws std::runtime_error on wrong keys or any tampering.
     static std::string decryptMessage(
         const std::vector<unsigned char>& payload,
         const std::vector<unsigned char>& enc,
-        const std::vector<unsigned char>& recipientSecretKey);
+        const std::vector<unsigned char>& recipientSecretKey,
+        const std::vector<unsigned char>& senderPublicKey);
 
     // Persistent encrypted private-key storage.
     //

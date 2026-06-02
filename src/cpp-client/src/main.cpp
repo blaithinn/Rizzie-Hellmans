@@ -67,14 +67,18 @@ int main() {
                      "3. Send message\n"
                      "4. View inbox\n"
                      "5. Forward message\n"
-                     "6. Quit\n"
+                     "6. Change password\n"
+                     "7. Download message\n"
+                     "8. Revoke access\n"
+                     "9. Delete message\n"
+                     "0. Quit\n"
                      "Choice: ";
 
         std::string line;
         if (!std::getline(std::cin, line)) break;
         if (line.empty()) continue;
 
-        int choice = 0;
+        int choice = -1;
         try { choice = std::stoi(line); } catch (...) {}
 
         switch (choice) {
@@ -97,10 +101,7 @@ int main() {
             break;
         }
         case 3: {
-            if (!client.isLoggedIn()) {
-                std::cout << "Please login first.\n";
-                break;
-            }
+            if (!client.isLoggedIn()) { std::cout << "Please login first.\n"; break; }
             std::string recipStr, plaintext;
             std::cout << "Recipient user ID: ";
             std::getline(std::cin, recipStr);
@@ -114,18 +115,12 @@ int main() {
             break;
         }
         case 4: {
-            if (!client.isLoggedIn()) {
-                std::cout << "Please login first.\n";
-                break;
-            }
+            if (!client.isLoggedIn()) { std::cout << "Please login first.\n"; break; }
             client.fetchAndDecryptMessages();
             break;
         }
         case 5: {
-            if (!client.isLoggedIn()) {
-                std::cout << "Please login first.\n";
-                break;
-            }
+            if (!client.isLoggedIn()) { std::cout << "Please login first.\n"; break; }
             std::string msgId, recipStr;
             std::cout << "Message ID to forward: ";
             std::getline(std::cin, msgId);
@@ -138,11 +133,51 @@ int main() {
             }
             break;
         }
-        case 6:
+        case 6: {
+            if (!client.isLoggedIn()) { std::cout << "Please login first.\n"; break; }
+            std::string current, next;
+            std::cout << "Current password: ";
+            std::getline(std::cin, current);
+            std::cout << "New password: ";
+            std::getline(std::cin, next);
+            client.changePassword(current, next);
+            break;
+        }
+        case 7: {
+            if (!client.isLoggedIn()) { std::cout << "Please login first.\n"; break; }
+            std::string msgId;
+            std::cout << "Message ID to download: ";
+            std::getline(std::cin, msgId);
+            client.downloadMessage(msgId);
+            break;
+        }
+        case 8: {
+            if (!client.isLoggedIn()) { std::cout << "Please login first.\n"; break; }
+            std::string msgId, uidStr;
+            std::cout << "Message ID: ";
+            std::getline(std::cin, msgId);
+            std::cout << "User ID to revoke: ";
+            std::getline(std::cin, uidStr);
+            try {
+                client.revokeAccess(msgId, std::stoi(uidStr));
+            } catch (...) {
+                std::cerr << "Invalid user ID.\n";
+            }
+            break;
+        }
+        case 9: {
+            if (!client.isLoggedIn()) { std::cout << "Please login first.\n"; break; }
+            std::string msgId;
+            std::cout << "Message ID to delete: ";
+            std::getline(std::cin, msgId);
+            client.deleteMessage(msgId);
+            break;
+        }
+        case 0:
             std::cout << "Goodbye.\n";
             return 0;
         default:
-            std::cout << "Invalid choice, enter 1-6.\n";
+            std::cout << "Invalid choice, enter 0-9.\n";
             break;
         }
     }

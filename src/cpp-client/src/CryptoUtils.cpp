@@ -31,8 +31,6 @@ std::vector<unsigned char> CryptoUtils::encryptMessage(
     const std::vector<unsigned char>& senderSecretKey,
     std::vector<unsigned char>& encOut)
 {
-    (void)senderSecretKey;  // DH uses ephemeral key; static sender key not bound in this mode
-
     if (sodium_init() < 0) {
         throw std::runtime_error("Failed to initialise libsodium");
     }
@@ -41,34 +39,47 @@ std::vector<unsigned char> CryptoUtils::encryptMessage(
     }
 
     // --- Step 1: Generate ephemeral X25519 key pair ---
-    // Fresh per-message ephemeral key means ciphertexts are unlinkable even to the
-    // same sender, and forward secrecy is preserved if the sender's static key leaks.
+    // Fresh per-message ephemeral key gives per-message forward secrecy.
     encOut.resize(crypto_box_PUBLICKEYBYTES);
     std::vector<unsigned char> ephSk(crypto_box_SECRETKEYBYTES);
     crypto_box_keypair(encOut.data(), ephSk.data());
 
-    // --- Step 2: X25519 Diffie-Hellman ---
-    std::vector<unsigned char> sharedSecret(crypto_scalarmult_BYTES);
-    if (crypto_scalarmult(sharedSecret.data(),
-                          ephSk.data(),
-                          recipientPublicKey.data()) != 0) {
+    // --- Step 2a: Ephemeral DH — X25519(eph_sk, recipient_pk) ---
+    std::vector<unsigned char> ephDH(crypto_scalarmult_BYTES);
+    if (crypto_scalarmult(ephDH.data(), ephSk.data(), recipientPublicKey.data()) != 0) {
         sodium_memzero(ephSk.data(), ephSk.size());
-        throw std::runtime_error("X25519 DH failed (low-order point rejected)");
+        throw std::runtime_error("X25519 ephemeral DH failed (low-order point rejected)");
     }
     sodium_memzero(ephSk.data(), ephSk.size());
 
-    // --- Step 3: HKDF-SHA256 key derivation (libsodium 1.0.19 native API) ---
-    unsigned char prk[crypto_kdf_hkdf_sha256_KEYBYTES];
+    // --- Step 2b: Static sender DH — X25519(sender_sk, recipient_pk) ---
+    // Binding the sender's static key means only the holder of sender_sk can produce
+    // a ciphertext that decrypts correctly under the recipient's key — sender auth.
+    std::vector<unsigned char> staticDH(crypto_scalarmult_BYTES);
+    if (crypto_scalarmult(staticDH.data(), senderSecretKey.data(), recipientPublicKey.data()) != 0) {
+        sodium_memzero(ephDH.data(), ephDH.size());
+        throw std::runtime_error("X25519 static DH failed (low-order point rejected)");
+    }
+
+    // --- Step 3: HKDF-SHA256 over eph_dh || static_dh ---
     // Null salt is RFC 5869 §2.2 compliant — libsodium substitutes 32 zero bytes.
+    std::vector<unsigned char> dhInput;
+    dhInput.reserve(ephDH.size() + staticDH.size());
+    dhInput.insert(dhInput.end(), ephDH.begin(), ephDH.end());
+    dhInput.insert(dhInput.end(), staticDH.begin(), staticDH.end());
+    sodium_memzero(ephDH.data(), ephDH.size());
+    sodium_memzero(staticDH.data(), staticDH.size());
+
+    unsigned char prk[crypto_kdf_hkdf_sha256_KEYBYTES];
     if (crypto_kdf_hkdf_sha256_extract(prk, nullptr, 0,
-                                        sharedSecret.data(), sharedSecret.size()) != 0) {
-        sodium_memzero(sharedSecret.data(), sharedSecret.size());
+                                        dhInput.data(), dhInput.size()) != 0) {
+        sodium_memzero(dhInput.data(), dhInput.size());
         throw std::runtime_error("HKDF extract failed");
     }
-    sodium_memzero(sharedSecret.data(), sharedSecret.size());
+    sodium_memzero(dhInput.data(), dhInput.size());
 
-    // Info = "securechat-v1" || eph_pk ties the key to this specific ephemeral exchange.
-    const std::string infoPrefix = "securechat-v1";
+    // Info = "securechat-v2" || eph_pk ties the derived key to this exchange.
+    const std::string infoPrefix = "securechat-v2";
     std::vector<unsigned char> info(infoPrefix.begin(), infoPrefix.end());
     info.insert(info.end(), encOut.begin(), encOut.end());
 
@@ -111,7 +122,8 @@ std::vector<unsigned char> CryptoUtils::encryptMessage(
 std::string CryptoUtils::decryptMessage(
     const std::vector<unsigned char>& payload,
     const std::vector<unsigned char>& enc,
-    const std::vector<unsigned char>& recipientSecretKey)
+    const std::vector<unsigned char>& recipientSecretKey,
+    const std::vector<unsigned char>& senderPublicKey)
 {
     if (sodium_init() < 0) {
         throw std::runtime_error("Failed to initialise libsodium");
@@ -125,25 +137,40 @@ std::string CryptoUtils::decryptMessage(
         throw std::runtime_error("Payload too short to be valid ciphertext");
     }
 
-    // --- Step 1: X25519 DH — recipient's static key + sender's ephemeral public key ---
-    // X25519 is commutative: X25519(recipient_sk, eph_pk) == X25519(eph_sk, recipient_pk)
-    std::vector<unsigned char> sharedSecret(crypto_scalarmult_BYTES);
-    if (crypto_scalarmult(sharedSecret.data(),
-                          recipientSecretKey.data(),
-                          enc.data()) != 0) {
-        throw std::runtime_error("X25519 DH failed");
+    // --- Step 1a: Ephemeral DH — X25519(recipient_sk, eph_pk) ---
+    // X25519 is commutative: DH(recipient_sk, eph_pk) == DH(eph_sk, recipient_pk)
+    std::vector<unsigned char> ephDH(crypto_scalarmult_BYTES);
+    if (crypto_scalarmult(ephDH.data(), recipientSecretKey.data(), enc.data()) != 0) {
+        throw std::runtime_error("X25519 ephemeral DH failed");
     }
 
-    // --- Step 2: HKDF-SHA256 key derivation (must mirror encryptMessage exactly) ---
+    // --- Step 1b: Static DH — X25519(recipient_sk, sender_pk) ---
+    // Mirrors DH(sender_sk, recipient_pk) computed during encryption.
+    // If senderPublicKey does not match the actual sender, the derived key differs
+    // and the AES-GCM tag check fails — this is how sender identity is verified.
+    std::vector<unsigned char> staticDH(crypto_scalarmult_BYTES);
+    if (crypto_scalarmult(staticDH.data(), recipientSecretKey.data(), senderPublicKey.data()) != 0) {
+        sodium_memzero(ephDH.data(), ephDH.size());
+        throw std::runtime_error("X25519 static DH failed");
+    }
+
+    // --- Step 2: HKDF-SHA256 over eph_dh || static_dh (mirrors encryptMessage) ---
+    std::vector<unsigned char> dhInput;
+    dhInput.reserve(ephDH.size() + staticDH.size());
+    dhInput.insert(dhInput.end(), ephDH.begin(), ephDH.end());
+    dhInput.insert(dhInput.end(), staticDH.begin(), staticDH.end());
+    sodium_memzero(ephDH.data(), ephDH.size());
+    sodium_memzero(staticDH.data(), staticDH.size());
+
     unsigned char prk[crypto_kdf_hkdf_sha256_KEYBYTES];
     if (crypto_kdf_hkdf_sha256_extract(prk, nullptr, 0,
-                                        sharedSecret.data(), sharedSecret.size()) != 0) {
-        sodium_memzero(sharedSecret.data(), sharedSecret.size());
+                                        dhInput.data(), dhInput.size()) != 0) {
+        sodium_memzero(dhInput.data(), dhInput.size());
         throw std::runtime_error("HKDF extract failed");
     }
-    sodium_memzero(sharedSecret.data(), sharedSecret.size());
+    sodium_memzero(dhInput.data(), dhInput.size());
 
-    const std::string infoPrefix = "securechat-v1";
+    const std::string infoPrefix = "securechat-v2";
     std::vector<unsigned char> info(infoPrefix.begin(), infoPrefix.end());
     info.insert(info.end(), enc.begin(), enc.end());
 
