@@ -18,6 +18,7 @@ add_executable(client
     src/Client.cpp
     src/HttpClient.cpp
     src/CryptoUtils.cpp
+    src/KeyStore.cpp
     src/MessageStore.cpp
 )
 

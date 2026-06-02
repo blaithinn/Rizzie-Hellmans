@@ -1,9 +1,15 @@
 #include "Client.h"
 #include "CryptoUtils.h"
 #include "Message.h"
+#include <cstdlib>
 #include <iostream>
 #include <algorithm>
 #include <stdexcept>
+
+static std::string defaultKeyStorePath() {
+    const char* home = std::getenv("HOME");
+    return std::string(home ? home : ".") + "/.rizzie/keys/trusted_keys.txt";
+}
 
 // Extract a string value from a flat JSON object — safe for base64/token/timestamp
 // fields that contain no embedded quotes or escape sequences.
@@ -67,7 +73,7 @@ static std::string decodeBase64Url(const std::string& input) {
     return std::string(bytes.begin(), bytes.end());
 }
 
-Client::Client(const std::string& url) : serverUrl(url) {
+Client::Client(const std::string& url) : serverUrl(url), keyStore_(defaultKeyStorePath()) {
     http  = std::make_unique<HttpClient>();
     store = std::make_unique<MessageStore>();
 }
@@ -117,14 +123,18 @@ bool Client::login(const std::string& username, const std::string& password) {
 
 void Client::sendMessage(int recipientUserId, const std::string& plaintext) {
     std::string pubkeyUrl = serverUrl + "/users/" + std::to_string(recipientUserId) + "/pubkey";
-    std::cerr << "[DEBUG] serverUrl = \"" << serverUrl << "\"\n";
-    std::cerr << "[DEBUG] pubkey GET = \"" << pubkeyUrl << "\"\n";
     std::string pubkeyResp = http->get(pubkeyUrl, token);
     std::string recipPubKeyB64 = extractField(pubkeyResp, "publicKey");
     if (recipPubKeyB64.empty()) {
         std::cerr << "Could not fetch recipient public key: " << pubkeyResp << "\n";
         return;
     }
+
+    if (!keyStore_.verifyAndPin(std::to_string(recipientUserId), recipPubKeyB64)) {
+        std::cerr << "Aborted: key verification failed for user " << recipientUserId << "\n";
+        return;
+    }
+
     auto recipPubKey = CryptoUtils::fromBase64(recipPubKeyB64);
 
     std::vector<unsigned char> encOut;
@@ -137,10 +147,7 @@ void Client::sendMessage(int recipientUserId, const std::string& plaintext) {
     std::string body = "{\"to\":" + std::to_string(recipientUserId) +
                        ",\"enc\":\"" + encB64 +
                        "\",\"ciphertext\":\"" + ciphertextB64 + "\"}";
-    std::cerr << "[DEBUG] POST " << url << "\n";
-    std::cerr << "[DEBUG] body: " << body << "\n";
     std::string response = http->post(url, body, token);
-    std::cerr << "[DEBUG] response: " << response << "\n";
     std::cout << "Message sent. Server: " << response << "\n";
 }
 

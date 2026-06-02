@@ -3,6 +3,7 @@
 #include <memory>
 #include <vector>
 #include "HttpClient.h"
+#include "KeyStore.h"
 #include "MessageStore.h"
 
 class Client {
@@ -25,6 +26,7 @@ private:
     std::string serverUrl;
     std::unique_ptr<HttpClient>   http;
     std::unique_ptr<MessageStore> store;
+    KeyStore keyStore_;
 
     std::string                token;
     int                        userId = 0;
