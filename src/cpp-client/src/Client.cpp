@@ -394,3 +394,7 @@ void Client::deleteMessage(const std::string& messageId) {
 
 bool Client::isLoggedIn() const { return currentUser_ != nullptr; }
 int  Client::getUserId()  const { return userId; }
+
+std::vector<Message> Client::getCachedMessages() const {
+    return store->getAllMessages();
+}
