@@ -46,14 +46,59 @@
     .subtitle{font-size:.9rem;color:var(--soft);font-weight:700;margin-top:8px;line-height:1.5;text-align:center;}
     .subtitle b{color:var(--pink);}
 
-    label{display:block;font-weight:800;font-size:.74rem;text-transform:uppercase;letter-spacing:.9px;color:#6a1fd0;margin:22px 0 7px;}
-    input[type="text"]{width:100%;border:2px solid var(--line);background:#fff;border-radius:14px;padding:13px 15px;
-      color:var(--ink);font-size:.92rem;font-family:var(--mono);outline:none;transition:border-color .15s,box-shadow .15s;}
+    /* Section headers */
+    .section-row{display:flex;align-items:center;gap:10px;margin:26px 0 14px;}
+    .section-pill{
+      font-family:"Fredoka",sans-serif;font-weight:600;font-size:.85rem;
+      background:var(--grad);color:#fff;border-radius:999px;padding:3px 12px;
+      white-space:nowrap;flex-shrink:0;box-shadow:0 4px 12px -6px rgba(160,30,170,.5);}
+    .section-rule{flex:1;height:1px;background:var(--line);}
+    .section-tag{font-size:.75rem;font-weight:800;color:var(--soft);white-space:nowrap;}
+
+    /* Or divider */
+    .or-divider{
+      display:flex;align-items:center;gap:12px;margin:22px 0;
+      color:var(--soft);font-size:.78rem;font-weight:800;text-transform:uppercase;letter-spacing:.8px;}
+    .or-divider::before,.or-divider::after{content:"";flex:1;height:1px;background:var(--line);}
+
+    /* Upload zone */
+    .upload-zone{
+      display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;
+      border:2px dashed var(--line);border-radius:18px;padding:24px 18px;
+      cursor:pointer;transition:border-color .15s,background .15s;
+      background:rgba(255,255,255,.5);position:relative;}
+    .upload-zone:hover,.upload-zone.dragover{border-color:var(--pink);background:rgba(255,45,182,.04);}
+    .upload-zone input[type="file"]{
+      position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;}
+    .upload-icon{font-size:2rem;filter:drop-shadow(0 3px 6px rgba(255,45,182,.35));}
+    .upload-text{font-weight:800;font-size:.9rem;color:var(--ink);}
+    .upload-hint{font-size:.76rem;color:var(--soft);font-weight:700;}
+
+    /* Parse confirmation */
+    .parse-box{border-radius:14px;padding:14px 16px;margin-top:12px;font-size:.8rem;font-weight:700;}
+    .parse-box.ok{background:linear-gradient(135deg,#f0fff7,#eaf4ff);border:1.5px solid #50d890;color:#0d6a3e;}
+    .parse-box.err{background:#fff0f5;border:1.5px solid #f87;color:#a0163e;}
+    .parse-box .parse-title{font-weight:800;margin-bottom:8px;}
+    .parse-field{font-family:var(--mono);font-size:.72rem;margin-top:4px;word-break:break-all;line-height:1.5;}
+    .parse-field .pf-key{opacity:.65;}
+
+    /* Labels and inputs */
+    label.field-label{
+      display:block;font-weight:800;font-size:.74rem;text-transform:uppercase;
+      letter-spacing:.9px;color:#6a1fd0;margin:18px 0 4px;}
+    .field-hint{font-size:.74rem;color:var(--soft);font-weight:700;margin:0 0 8px;}
+    input[type="text"]{
+      width:100%;border:2px solid var(--line);background:#fff;border-radius:14px;
+      padding:13px 15px;color:var(--ink);font-size:.92rem;font-family:var(--mono);
+      outline:none;transition:border-color .15s,box-shadow .15s;}
     input[type="text"]:focus{border-color:var(--pink);box-shadow:0 0 0 4px rgba(255,45,182,.16);}
     input[type="text"]::placeholder{color:#cba9cf;}
 
-    button#verifyBtn{margin-top:16px;width:100%;border:none;border-radius:999px;padding:15px;cursor:pointer;position:relative;overflow:hidden;
-      font-family:"Fredoka",sans-serif;font-weight:600;font-size:1.1rem;color:#fff;background:var(--grad);
+    /* Verify button */
+    button#verifyBtn{
+      margin-top:20px;width:100%;border:none;border-radius:999px;padding:15px;cursor:pointer;
+      position:relative;overflow:hidden;font-family:"Fredoka",sans-serif;font-weight:600;
+      font-size:1.1rem;color:#fff;background:var(--grad);
       box-shadow:0 10px 30px -8px rgba(170,30,180,.55),inset 0 1px 0 rgba(255,255,255,.6);
       text-shadow:0 1px 2px rgba(120,10,120,.35);transition:transform .12s,filter .15s;}
     button#verifyBtn::after{content:"";position:absolute;inset:0;background:var(--gloss);border-radius:inherit;pointer-events:none;}
@@ -61,25 +106,31 @@
     button#verifyBtn:active:not(:disabled){transform:translateY(0) scale(.98);}
     button#verifyBtn:disabled{opacity:.55;cursor:not-allowed;}
 
+    /* Loading */
+    .loading{display:flex;align-items:center;gap:12px;color:var(--soft);font-size:.9rem;font-weight:800;margin-top:16px;}
+    .spinner{width:22px;height:22px;border:3px solid var(--line);border-top-color:var(--pink);border-radius:50%;animation:spin .7s linear infinite;flex-shrink:0;}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    .hidden{display:none;}
+
+    /* Result */
     #result{margin-top:20px;}
     .status-box{border-radius:18px;padding:20px 22px;display:flex;align-items:flex-start;gap:16px;position:relative;overflow:hidden;animation:pop .25s cubic-bezier(.2,.9,.3,1.3);}
     @keyframes pop{from{transform:scale(.94);opacity:0}to{transform:none;opacity:1}}
     .status-box.pass{background:linear-gradient(150deg,#fff0fa,#f3e6ff);border:2px solid var(--pink);}
     .status-box.fail{background:#fff0f3;border:2px solid #e01f7a;}
     .stamp{flex-shrink:0;font-size:2.6rem;filter:drop-shadow(0 4px 8px rgba(255,45,182,.4));line-height:1;}
-    .status-detail{flex:1;}
-    .badge{display:inline-block;font-family:"Fredoka",sans-serif;font-weight:700;font-size:1.25rem;letter-spacing:.3px;
-      padding:3px 14px;border-radius:999px;color:#fff;margin-bottom:8px;box-shadow:0 6px 16px -8px rgba(160,30,170,.7);}
+    .status-detail{flex:1;min-width:0;}
+    .badge{display:inline-block;font-family:"Fredoka",sans-serif;font-weight:700;font-size:1.25rem;
+      letter-spacing:.3px;padding:3px 14px;border-radius:999px;color:#fff;margin-bottom:8px;
+      box-shadow:0 6px 16px -8px rgba(160,30,170,.7);}
     .pass .badge{background:var(--grad);}
     .fail .badge{background:linear-gradient(120deg,#e01f7a,#b3105e);}
     .status-detail .line{font-size:.84rem;color:var(--soft);font-weight:700;margin-top:6px;line-height:1.5;}
-    .status-detail .kv{font-family:var(--mono);font-size:.78rem;color:var(--ink);word-break:break-all;background:rgba(255,255,255,.7);
-      border:1px solid var(--line);border-radius:10px;padding:8px 10px;margin-top:8px;}
+    .kv-label{font-size:.7rem;font-weight:800;text-transform:uppercase;letter-spacing:.7px;color:var(--soft);margin-top:10px;margin-bottom:3px;}
+    .status-detail .kv{
+      font-family:var(--mono);font-size:.75rem;color:var(--ink);word-break:break-all;
+      background:rgba(255,255,255,.7);border:1px solid var(--line);border-radius:10px;padding:8px 10px;}
 
-    .loading{display:flex;align-items:center;gap:12px;color:var(--soft);font-size:.9rem;font-weight:800;margin-top:16px;}
-    .spinner{width:22px;height:22px;border:3px solid var(--line);border-top-color:var(--pink);border-radius:50%;animation:spin .7s linear infinite;flex-shrink:0;}
-    @keyframes spin{to{transform:rotate(360deg)}}
-    .hidden{display:none;}
     .foot{text-align:center;margin-top:22px;font-size:.78rem;color:var(--soft);font-weight:700;}
     .foot a{color:#6a1fd0;font-weight:800;text-decoration:none;}
   </style>
@@ -90,24 +141,52 @@
       <div class="em">🔥💘</div>
       <h1>Certify Your Rizz</h1>
       <p class="subtitle">
-        Paste a transaction hash to prove a rizz was sealed on the Sepolia blockchain.<br>
-        <b>Certified Rizz</b> = real, on-chain &amp; timestamped. <b>Fake Rizz</b> = couldn’t be verified.
+        Prove a rizz was sealed on the Sepolia blockchain — tamper-proof and timestamped.<br>
+        <b>Certified Rizz</b> = real, on-chain &amp; verified. <b>Fake Rizz</b> = couldn't be verified.
       </p>
     </div>
 
-    <label for="txInput">Transaction Hash</label>
-    <input
-      type="text"
-      id="txInput"
-      placeholder="0x..."
-      autocomplete="off"
-      spellcheck="false"
-    />
+    <!-- Option A: File Upload -->
+    <div class="section-row">
+      <span class="section-pill">Option A</span>
+      <div class="section-rule"></div>
+      <span class="section-tag">Upload message file</span>
+    </div>
+    <div class="upload-zone" id="uploadZone">
+      <input type="file" id="fileInput" accept=".txt">
+      <span class="upload-icon">📎</span>
+      <span class="upload-text">Click or drag your downloaded .txt file here</span>
+      <span class="upload-hint">The file you received when downloading a message — all fields will be auto-filled</span>
+    </div>
+    <div id="parseResult"></div>
+
+    <!-- Divider -->
+    <div class="or-divider">or fill in manually</div>
+
+    <!-- Option B: Manual paste -->
+    <div class="section-row">
+      <span class="section-pill">Option B</span>
+      <div class="section-rule"></div>
+      <span class="section-tag">Paste from downloaded file</span>
+    </div>
+
+    <label class="field-label" for="txInput">Transaction Hash</label>
+    <p class="field-hint">The <b>Tx Hash</b> line from your downloaded message file</p>
+    <input type="text" id="txInput" placeholder="0x…" autocomplete="off" spellcheck="false" />
+
+    <label class="field-label" for="encInput">enc (base64)</label>
+    <p class="field-hint">The <b>enc</b> value from the <em>encrypted blobs</em> section of your file</p>
+    <input type="text" id="encInput" placeholder="Base64 string from the enc line…" autocomplete="off" spellcheck="false" />
+
+    <label class="field-label" for="cipherInput">ciphertext (base64)</label>
+    <p class="field-hint">The <b>ciphertext</b> value from the <em>encrypted blobs</em> section of your file</p>
+    <input type="text" id="cipherInput" placeholder="Base64 string from the ciphertext line…" autocomplete="off" spellcheck="false" />
+
     <button id="verifyBtn" onclick="verify()">🔍 Check The Rizz</button>
 
     <div id="loading" class="loading hidden">
       <div class="spinner"></div>
-      <span>Sliding into Sepolia to check this rizz…</span>
+      <span id="loadingMsg">Sliding into Sepolia to check this rizz…</span>
     </div>
 
     <div id="result"></div>
@@ -117,43 +196,150 @@
 
   <script src="https://cdn.jsdelivr.net/npm/ethers@6.13.0/dist/ethers.umd.min.js"></script>
   <script>
-    /* ---------------------------------------------------------------
-       VERIFICATION LOGIC — UNCHANGED from the original verify.html.
-       Same RPC endpoint, contract address, event ABI and control flow.
-       Only the on-screen wording (Certified Rizz / Fake Rizz) and the
-       optional ?tx= auto-fill are presentation-layer additions.
-       --------------------------------------------------------------- */
-    const ALCHEMY_URL     = 'https://eth-sepolia.g.alchemy.com/v2/c-h7TYzFwnL7ugaFXJf2U';
-    const CONTRACT_ADDR   = '0xA1bdB7222B244417CCaB6EAeD2cd3d27dADee65A';
+    // ── Event ABI (matches contract.json) ─────────────────────────────────
+    const EVENT_ABI = [{
+      anonymous: false,
+      inputs: [
+        { indexed: true,  internalType: 'address', name: 'sender',    type: 'address' },
+        { indexed: false, internalType: 'bytes32', name: 'hash',      type: 'bytes32' },
+        { indexed: false, internalType: 'uint256', name: 'timestamp', type: 'uint256' }
+      ],
+      name: 'HashStored',
+      type: 'event'
+    }];
 
-    const EVENT_ABI = [
-      {
-        anonymous: false,
-        inputs: [
-          { indexed: true,  internalType: 'address', name: 'sender',    type: 'address'  },
-          { indexed: false, internalType: 'bytes32', name: 'hash',      type: 'bytes32'  },
-          { indexed: false, internalType: 'uint256', name: 'timestamp', type: 'uint256'  }
-        ],
-        name: 'HashStored',
-        type: 'event'
+    // Standard base64 — matches sodium_base64_VARIANT_ORIGINAL used server-side
+    const BASE64_RE = /^[A-Za-z0-9+/]+={0,2}$/;
+
+    // ── Config (fetched once; RPC URL and contract address from server .env) ──
+    let _cfg = null;
+    async function getConfig() {
+      if (_cfg) return _cfg;
+      let resp;
+      try {
+        resp = await fetch('/api/config');
+      } catch (e) {
+        throw new Error('Could not reach the server to load configuration. Are you connected?');
       }
-    ];
+      if (!resp.ok) throw new Error('Server returned an error loading configuration (HTTP ' + resp.status + ').');
+      _cfg = await resp.json();
+      if (!_cfg.rpcUrl)          throw new Error('Server is missing SEPOLIA_RPC_URL — contact the site admin.');
+      if (!_cfg.contractAddress) throw new Error('Server is missing CONTRACT_ADDRESS — contact the site admin.');
+      return _cfg;
+    }
 
+    // ── Base64 helpers ─────────────────────────────────────────────────────
+    function isValidBase64(str) {
+      return typeof str === 'string' && str.length > 0 && str.length % 4 === 0 && BASE64_RE.test(str);
+    }
+
+    function base64ToBytes(b64) {
+      const binary = atob(b64);
+      const out = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) out[i] = binary.charCodeAt(i);
+      return out;
+    }
+
+    // ── File parser ────────────────────────────────────────────────────────
+    // Extracts Tx Hash / enc / ciphertext by splitting each line on the first colon.
+    function parseMessageFile(text) {
+      const lines = text.split(/\r?\n/);
+      const found = {};
+      for (const raw of lines) {
+        const ci = raw.indexOf(':');
+        if (ci === -1) continue;
+        const key = raw.slice(0, ci).trim().toLowerCase().replace(/\s+/g, ' ');
+        const val = raw.slice(ci + 1).trim();
+        if      (key === 'tx hash')    found.txHash     = val;
+        else if (key === 'enc')        found.enc        = val;
+        else if (key === 'ciphertext') found.ciphertext = val;
+      }
+      const missing = [];
+      if (!found.txHash)     missing.push('Tx Hash');
+      if (!found.enc)        missing.push('enc');
+      if (!found.ciphertext) missing.push('ciphertext');
+      if (missing.length) throw new Error('File is missing required fields: ' + missing.join(', ') + '. Make sure this is a downloaded message file.');
+      return found;
+    }
+
+    // ── Upload zone wiring ─────────────────────────────────────────────────
+    const fileInput   = document.getElementById('fileInput');
+    const uploadZone  = document.getElementById('uploadZone');
+    const parseResult = document.getElementById('parseResult');
+
+    fileInput.addEventListener('change', () => {
+      if (fileInput.files.length) handleFile(fileInput.files[0]);
+    });
+    uploadZone.addEventListener('dragover',  e => { e.preventDefault(); uploadZone.classList.add('dragover'); });
+    uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('dragover'));
+    uploadZone.addEventListener('drop', e => {
+      e.preventDefault();
+      uploadZone.classList.remove('dragover');
+      const f = e.dataTransfer.files[0];
+      if (f) handleFile(f);
+    });
+
+    function handleFile(file) {
+      const reader = new FileReader();
+      reader.onload = e => {
+        try {
+          const parsed = parseMessageFile(e.target.result);
+          document.getElementById('txInput').value     = parsed.txHash;
+          document.getElementById('encInput').value    = parsed.enc;
+          document.getElementById('cipherInput').value = parsed.ciphertext;
+          showParseOk(parsed);
+        } catch (err) {
+          showParseErr(err.message);
+        }
+      };
+      reader.onerror = () => showParseErr('Could not read the file — please try again.');
+      reader.readAsText(file);
+    }
+
+    function showParseOk(p) {
+      parseResult.innerHTML =
+        '<div class="parse-box ok">' +
+          '<div class="parse-title">✅ File parsed — fields auto-filled below</div>' +
+          '<div class="parse-field"><span class="pf-key">Tx Hash    : </span>' + escHtml(p.txHash)     + '</div>' +
+          '<div class="parse-field"><span class="pf-key">enc        : </span>' + escHtml(p.enc)        + '</div>' +
+          '<div class="parse-field"><span class="pf-key">ciphertext : </span>' + escHtml(p.ciphertext) + '</div>' +
+        '</div>';
+    }
+
+    function showParseErr(msg) {
+      parseResult.innerHTML =
+        '<div class="parse-box err">' +
+          '<div class="parse-title">⚠️ Could not parse file</div>' +
+          '<div class="parse-field">' + escHtml(msg) + '</div>' +
+        '</div>';
+    }
+
+    // ── Main verify flow ───────────────────────────────────────────────────
     async function verify() {
-      const txHash  = document.getElementById('txInput').value.trim();
-      const btn     = document.getElementById('verifyBtn');
-      const loading = document.getElementById('loading');
-      const result  = document.getElementById('result');
+      const txHash     = document.getElementById('txInput').value.trim();
+      const enc        = document.getElementById('encInput').value.trim();
+      const ciphertext = document.getElementById('cipherInput').value.trim();
+      const btn        = document.getElementById('verifyBtn');
+      const loading    = document.getElementById('loading');
+      const loadMsg    = document.getElementById('loadingMsg');
+      const result     = document.getElementById('result');
 
       result.innerHTML = '';
 
-      if (!txHash) {
-        showFail('Please enter a transaction hash.');
+      if (!txHash || !enc || !ciphertext) {
+        showFail('All three fields are required — Transaction Hash, enc, and ciphertext.');
         return;
       }
-
       if (!/^0x[0-9a-fA-F]{64}$/.test(txHash)) {
-        showFail('Invalid format — a transaction hash must be 0x followed by 64 hex characters.');
+        showFail('Invalid transaction hash — must be 0x followed by exactly 64 hex characters.');
+        return;
+      }
+      if (!isValidBase64(enc)) {
+        showFail('enc is not valid base64. Copy it exactly from the downloaded file (it should look like JaYB2Qeb… and may end with = or ==).');
+        return;
+      }
+      if (!isValidBase64(ciphertext)) {
+        showFail('ciphertext is not valid base64. Copy it exactly from the downloaded file.');
         return;
       }
 
@@ -161,101 +347,130 @@
       loading.classList.remove('hidden');
 
       try {
-        const provider = new ethers.JsonRpcProvider(ALCHEMY_URL);
+        // Step 1 — load config from server
+        loadMsg.textContent = 'Loading configuration…';
+        const cfg = await getConfig();
+
+        // Step 2 — compute keccak256(enc_bytes + ciphertext_bytes) locally
+        // This must match what blockchain.js does: keccak256(Buffer.concat([encBytes, ciphertextBytes]))
+        loadMsg.textContent = 'Computing hash…';
+        let computedHash;
+        try {
+          const encBytes    = base64ToBytes(enc);
+          const cipherBytes = base64ToBytes(ciphertext);
+          const combined    = new Uint8Array(encBytes.length + cipherBytes.length);
+          combined.set(encBytes,    0);
+          combined.set(cipherBytes, encBytes.length);
+          computedHash = ethers.keccak256(combined);
+        } catch (e) {
+          showFail('Failed to decode base64 and compute hash: ' + e.message);
+          return;
+        }
+
+        // Step 3 — fetch transaction receipt from Sepolia
+        loadMsg.textContent = 'Sliding into Sepolia…';
+        const provider = new ethers.JsonRpcProvider(cfg.rpcUrl);
         const receipt  = await provider.getTransactionReceipt(txHash);
 
         if (!receipt) {
-          showFail('Transaction not found on Sepolia. It may not exist or may not yet be mined.');
+          showFail('Transaction not found on Sepolia. It may not exist yet, may still be pending, or the hash is wrong.');
           return;
         }
-
         if (receipt.status !== 1) {
-          showFail('Transaction was found but it failed (status = 0). No hash was recorded.');
+          showFail('Transaction was found but it failed (status = 0). No hash was recorded on-chain.');
           return;
         }
 
+        // Step 4 — find the HashStored event log
         const iface = new ethers.Interface(EVENT_ABI);
-        let found   = null;
-
+        let found = null;
         for (const log of receipt.logs) {
-          if (log.address.toLowerCase() !== CONTRACT_ADDR.toLowerCase()) continue;
+          if (log.address.toLowerCase() !== cfg.contractAddress.toLowerCase()) continue;
           try {
             const parsed = iface.parseLog({ topics: Array.from(log.topics), data: log.data });
-            if (parsed && parsed.name === 'HashStored') {
-              found = parsed;
-              break;
-            }
-          } catch (_) {
-            // log belongs to a different event — skip
-          }
+            if (parsed && parsed.name === 'HashStored') { found = parsed; break; }
+          } catch (_) { /* different event signature — skip */ }
         }
 
         if (!found) {
-          showFail('Transaction succeeded but no HashStored event was emitted by the contract.');
+          showFail('Transaction succeeded but no HashStored event was found in the logs. This transaction may not be from this app.');
           return;
         }
 
-        const tsSeconds = Number(found.args.timestamp);
-        const date      = new Date(tsSeconds * 1000);
-        const dateStr   = date.toUTCString();
+        // Step 5 — extract on-chain data and compare
+        const storedHash = found.args.hash;
+        const tsSeconds  = Number(found.args.timestamp);
+        const dateStr    = new Date(tsSeconds * 1000).toUTCString();
 
-        showPass(dateStr, found.args.hash);
+        if (computedHash.toLowerCase() === storedHash.toLowerCase()) {
+          showPass(dateStr, computedHash, storedHash);
+        } else {
+          showMismatch(dateStr, computedHash, storedHash);
+        }
 
       } catch (err) {
-        showFail('Error contacting the network: ' + err.message);
+        showFail('Network or RPC error: ' + err.message);
       } finally {
         btn.disabled = false;
         loading.classList.add('hidden');
       }
     }
 
-    function showPass(dateStr, hashBytes) {
-      const result = document.getElementById('result');
-      result.innerHTML = `
-        <div class="status-box pass">
-          <span class="stamp">💘🔥</span>
-          <div class="status-detail">
-            <span class="badge">Certified Rizz ✓</span>
-            <div class="line">This rizz is <b>100% real</b> — sealed on-chain with a verified timestamp. No cap detected.</div>
-            <div class="line">⏱️ Sealed: ${escHtml(dateStr)}</div>
-            <div class="kv">🔒 ${escHtml(hashBytes)}</div>
-          </div>
-        </div>`;
+    // ── Result renderers ───────────────────────────────────────────────────
+    function showPass(dateStr, computedHash, storedHash) {
+      document.getElementById('result').innerHTML =
+        '<div class="status-box pass">' +
+          '<span class="stamp">💘🔥</span>' +
+          '<div class="status-detail">' +
+            '<span class="badge">Certified Rizz ✓</span>' +
+            '<div class="line">This rizz is <b>100% real</b> — sealed on-chain. No cap detected.</div>' +
+            '<div class="line">⏱️ Sealed: ' + escHtml(dateStr) + '</div>' +
+            '<div class="kv-label">Computed hash (your data)</div>' +
+            '<div class="kv">' + escHtml(computedHash) + '</div>' +
+            '<div class="kv-label">On-chain hash (blockchain)</div>' +
+            '<div class="kv">' + escHtml(storedHash) + '</div>' +
+            '<div class="line" style="color:#0d6a3e;margin-top:10px;">✅ Hashes match — content is authentic and unmodified</div>' +
+          '</div>' +
+        '</div>';
+    }
+
+    function showMismatch(dateStr, computedHash, storedHash) {
+      document.getElementById('result').innerHTML =
+        '<div class="status-box fail">' +
+          '<span class="stamp">💔🧢</span>' +
+          '<div class="status-detail">' +
+            '<span class="badge">Hash Mismatch ✕</span>' +
+            '<div class="line">The transaction exists on-chain but the hash doesn\'t match the enc/ciphertext you provided. The content may have been tampered with, or the wrong enc/ciphertext was given.</div>' +
+            '<div class="line">⏱️ Blockchain record: ' + escHtml(dateStr) + '</div>' +
+            '<div class="kv-label">Computed hash (your data)</div>' +
+            '<div class="kv">' + escHtml(computedHash) + '</div>' +
+            '<div class="kv-label">On-chain hash (blockchain)</div>' +
+            '<div class="kv">' + escHtml(storedHash) + '</div>' +
+          '</div>' +
+        '</div>';
     }
 
     function showFail(reason) {
-      const result = document.getElementById('result');
-      result.innerHTML = `
-        <div class="status-box fail">
-          <span class="stamp">💔🧢</span>
-          <div class="status-detail">
-            <span class="badge">Fake Rizz ✕</span>
-            <div class="line">Couldn’t certify this rizz — it’s giving fugazi.</div>
-            <div class="kv">${escHtml(reason)}</div>
-          </div>
-        </div>`;
+      document.getElementById('result').innerHTML =
+        '<div class="status-box fail">' +
+          '<span class="stamp">💔🧢</span>' +
+          '<div class="status-detail">' +
+            '<span class="badge">Fake Rizz ✕</span>' +
+            '<div class="line">Couldn\'t certify this rizz — it\'s giving fugazi.</div>' +
+            '<div class="kv">' + escHtml(reason) + '</div>' +
+          '</div>' +
+        '</div>';
     }
 
+    // ── Utility ────────────────────────────────────────────────────────────
     function escHtml(str) {
       return String(str)
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;');
+        .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
     }
 
-    document.getElementById('txInput').addEventListener('keydown', function (e) {
-      if (e.key === 'Enter') verify();
-    });
-
-    // Optional deep-link: /verify?tx=0x...  auto-fills and verifies.
+    // ── Init ───────────────────────────────────────────────────────────────
     (function () {
-      const tx = new URLSearchParams(location.search).get('tx');
-      if (tx) {
-        document.getElementById('txInput').value = tx;
-        if (/^0x[0-9a-fA-F]{64}$/.test(tx)) verify();
-      }
-      // floating hearts/flames
+      // Floating hearts/flames
       const em = ['💘','🔥','💕','✨','💋'];
       for (let i = 0; i < 7; i++) {
         const s = document.createElement('div');

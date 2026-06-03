@@ -518,7 +518,6 @@
         "From ID    : " + data.from,
         "Sent At    : " + data.sentAt,
         "Tx Hash    : " + (data.txHash || "(none)"),
-        "Verify at  : /verify?tx=" + (data.txHash || ""),
         "",
         "Decrypted rizz:",
         plaintext,
