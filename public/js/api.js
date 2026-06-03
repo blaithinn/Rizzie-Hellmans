@@ -1,6 +1,6 @@
 /* =====================================================================
    RizzAPI — thin wrapper over the real backend routes (src/server/index.js).
-   NOTE: routes live at the ROOT (no /api/v1 prefix), matching index.js.
+   NOTE: routes live at the ROOT, matching index.js.
    All calls are same-origin relative paths, served from /public.
    ===================================================================== */
 (function () {

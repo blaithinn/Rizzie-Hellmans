@@ -15,6 +15,7 @@ const {
 } = require('./middleware/validation');
 
 const app = express();
+app.disable('x-powered-by');
 
 app.use((req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
