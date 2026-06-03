@@ -75,29 +75,52 @@ sudo ldconfig
 
 ## Server Setup
 
-### 1. Install dependencies
+The server runs on a university VM managed via `pm2`. The live URL is `https://rizzie-hellmans.theburkenator.com`.
+
+### SSH into the VM
 ```bash
-cd src/server
-npm install
+ssh -i <path_to_your_key> student@200.69.13.70 -p 2217
 ```
 
-### 2. Configure environment variables
-Create a `.env` file in the **repository root**:
+### Check if the server is already running
+```bash
+pm2 status
+```
+
+### Restart after a git pull
+```bash
+cd ~/Rizzie-Hellmans
+git pull
+cd src/server
+npm install
+pm2 restart rizzie-api
+```
+
+### Start from scratch (if not running)
+```bash
+cd ~/Rizzie-Hellmans/src/server
+pm2 start index.js --name rizzie-api
+```
+
+### View logs
+```bash
+pm2 logs rizzie-api
+```
+
+### Confirm it's live
+```bash
+curl https://rizzie-hellmans.theburkenator.com/health
+```
+Or open `https://rizzie-hellmans.theburkenator.com` in a browser.
+
+### Environment variables
+The `.env` file lives in the repository root on the VM. `JWT_SECRET` is mandatory — the server refuses to start without it. The three blockchain variables are optional; if omitted, messages are stored without a blockchain record and the server logs a warning.
 ```
 JWT_SECRET=<a long random secret>
 SEPOLIA_RPC_URL=https://eth-sepolia.g.alchemy.com/v2/<your-alchemy-key>
 SERVER_WALLET_PRIVATE_KEY=<ethereum wallet private key with Sepolia ETH>
 CONTRACT_ADDRESS=0xA1bdB7222B244417CCaB6EAeD2cd3d27dADee65A
 ```
-
-`JWT_SECRET` is mandatory — the server refuses to start without it. The three blockchain variables are optional; if omitted, messages are stored without a blockchain record and the server logs a warning.
-
-### 3. Run the server
-```bash
-node src/server/index.js
-```
-
-The server starts on port 80 and serves the static frontend from `public/`. The SQLite database (`users.db`) is created automatically on first run inside `src/server/`.
 
 ---
 
