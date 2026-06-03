@@ -26,6 +26,7 @@ public:
 
     bool isLoggedIn() const;
     int  getUserId()  const;
+    std::vector<Message> getCachedMessages() const;
 
 private:
     std::string serverUrl;
