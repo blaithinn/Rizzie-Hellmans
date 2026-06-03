@@ -29,6 +29,8 @@ public:
     // "enc" field so the recipient can reproduce the same shared secret.
     //
     // Return value layout: nonce (12 bytes) || ciphertext+tag (plaintext.size() + 16 bytes)
+    // The ephemeral public key (encOut / "enc" field) is bound as AEAD additional data,
+    // so any tampering with or substitution of that field causes the tag check to fail.
     static std::vector<unsigned char> encryptMessage(
         const std::string& plaintext,
         const std::vector<unsigned char>& recipientPublicKey,

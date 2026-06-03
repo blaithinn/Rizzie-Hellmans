@@ -257,15 +257,28 @@ void Client::fetchAndDecryptMessages() {
               << sentCount     << " sent across "
               << partners.size() << " conversation(s).\n\n";
 
-    // Pre-fetch public keys for every unique sender so decryptMessage can verify sender identity
+    // Pre-fetch public keys for every unique sender so decryptMessage can verify sender identity.
+    // TOFU pin check: if the key has changed since first contact, skip decryption and warn.
     std::map<std::string, std::vector<unsigned char>> senderPubKeys;
+    std::set<std::string> untrustedSenders;
     for (size_t i = 0; i < objects.size(); ++i) {
         const std::string& from = fromList[i];
-        if (from != std::to_string(userId) && !senderPubKeys.count(from)) {
+        if (from != std::to_string(userId) && !senderPubKeys.count(from)
+                && !untrustedSenders.count(from)) {
             std::string pkResp = http->get(serverUrl + "/users/" + from + "/pubkey", token);
             std::string pkB64  = extractField(pkResp, "publicKey");
-            if (!pkB64.empty())
-                senderPubKeys[from] = CryptoUtils::fromBase64(pkB64);
+            if (pkB64.empty()) {
+                untrustedSenders.insert(from);
+                continue;
+            }
+            if (!keyStore_.verifyAndPin(from, pkB64)) {
+                std::cout << "WARNING: public key for user " << from
+                          << " has changed — possible MITM. Messages from this sender "
+                          << "will not be decrypted until you verify the key change.\n";
+                untrustedSenders.insert(from);
+                continue;
+            }
+            senderPubKeys[from] = CryptoUtils::fromBase64(pkB64);
         }
     }
 
@@ -284,7 +297,9 @@ void Client::fetchAndDecryptMessages() {
         std::string partner = (from == std::to_string(userId)) ? to : from;
 
         std::string plaintext;
-        if (from == std::to_string(userId)) {
+        if (from != std::to_string(userId) && untrustedSenders.count(from)) {
+            plaintext = "[message not decrypted: sender key could not be verified]";
+        } else if (from == std::to_string(userId)) {
             plaintext = "[sent — encrypted to recipient]";
         } else {
             try {

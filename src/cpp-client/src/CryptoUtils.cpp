@@ -101,7 +101,7 @@ std::vector<unsigned char> CryptoUtils::encryptMessage(
     if (crypto_aead_aes256gcm_encrypt(
             ciphertext.data(), &ciphertextLen,
             reinterpret_cast<const unsigned char*>(plaintext.data()), plaintext.size(),
-            nullptr, 0,   // no additional authenticated data
+            encOut.data(), encOut.size(),
             nullptr,      // nsec — unused by this primitive
             nonce.data(),
             aesKey.data()) != 0) {
@@ -194,7 +194,7 @@ std::string CryptoUtils::decryptMessage(
             plaintext.data(), &plaintextLen,
             nullptr,            // nsec — unused
             ciphertext, ciphertextLen,
-            nullptr, 0,         // no additional authenticated data
+            enc.data(), enc.size(),
             nonce,
             aesKey.data()) != 0) {
         sodium_memzero(aesKey.data(), aesKey.size());
