@@ -1,7 +1,7 @@
 # Rizzie-Hellmans — REST API Documentation
 
-**Base URL:** `https://rizzie-hellmans.theburkenator.com/api/v1`  
-**Backend:** Node.js + PostgreSQL  
+**Base URL:** `https://rizzie-hellmans.theburkenator.com`  
+**Backend:** Node.js + SQLite  
 **Auth:** JWT Bearer token required on all endpoints except `/auth/*` and `/health`
 
 Include the token in the `Authorization` header:
@@ -23,6 +23,21 @@ Returns 200 if the server is running. No authentication required.
 
 ---
 
+## Configuration
+
+### `GET /api/config`
+Returns public blockchain configuration values needed by the client. No authentication required.
+
+**Response `200 OK`:**
+```json
+{
+  "rpcUrl": "<Sepolia RPC URL>",
+  "contractAddress": "<deployed contract address>"
+}
+```
+
+---
+
 ## Authentication
 
 ### `POST /auth/register`
@@ -39,9 +54,7 @@ Register a new user. Stores an Argon2id hash of the password and the user's publ
 
 **Response `201 Created`:**
 ```json
-{
-  "userId": 1
-}
+{ "message": "User registered successfully" }
 ```
 
 **Error responses:**
@@ -66,8 +79,7 @@ Authenticate a user and return a JWT session token.
 **Response `200 OK`:**
 ```json
 {
-  "token": "<JWT>",
-  "expiresIn": 3600
+  "token": "<JWT>"
 }
 ```
 
@@ -123,6 +135,7 @@ Fetch a registered user's public key for use in HPKE encryption.
 | Status | Meaning |
 |--------|---------|
 | `404` | User not found |
+| `404` | User has not published a public key |
 
 ---
 
@@ -164,8 +177,7 @@ On receipt, the server computes `keccak256(enc || ciphertext)`, writes it to the
 {
   "to": "recipient-user-id",
   "enc": "<base64-encoded HPKE encapsulated key>",
-  "ciphertext": "<base64-encoded HPKE ciphertext>",
-  "txHash": "<Ethereum transaction hash (optional — server can compute)"
+  "ciphertext": "<base64-encoded HPKE ciphertext>"
 }
 ```
 
@@ -220,7 +232,7 @@ Delete a message. The authenticated user must own the message.
 **Error responses:**
 | Status | Meaning |
 |--------|---------|
-| `403` | User does not own this message |
+| `403` | Access denied |
 | `404` | Message not found |
 
 ---
@@ -275,7 +287,7 @@ Re-encrypt and forward a message to another user. The client must verify the rec
 **Error responses:**
 | Status | Meaning |
 |--------|---------|
-| `403` | User does not have access to the original message |
+| `403` | Access denied |
 | `404` | Message or recipient not found |
 
 ---
@@ -293,7 +305,7 @@ Revoke a specific user's access to a shared message. Only the message owner can 
 **Error responses:**
 | Status | Meaning |
 |--------|---------|
-| `403` | Only the message owner can revoke access |
+| `403` | Access denied |
 | `404` | Message or user not found |
 
 ---
@@ -312,7 +324,7 @@ All error responses follow this structure:
 ## Notes
 
 - All request and response bodies are `application/json`
-- JWTs expire after 1 hour (`expiresIn: 3600`). Clients should handle `401` responses and prompt re-login
+- JWTs expire after 24 hours. Clients should handle `401` responses and prompt re-login
 - The server never stores or logs plaintext message content
 - The `enc` field is the HPKE ephemeral public key (encapsulated key), required by the recipient for HPKE decapsulation
 - Transaction hashes (`txHash`) reference records on the Ethereum Sepolia testnet — verifiable at `/verify`
