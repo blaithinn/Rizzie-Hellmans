@@ -123,7 +123,7 @@ bool Client::registerUser(const std::string& username, const std::string& passwo
 
     std::string response = http->post(url, body);
 
-    if (response.find("\"userId\"") == std::string::npos) {
+    if (response.find("\"message\"") == std::string::npos) {
         std::cerr << "Registration failed: " << response << "\n";
         return false;
     }
