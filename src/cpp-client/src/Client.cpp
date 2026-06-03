@@ -4,10 +4,29 @@
 #include "Conversation.h"
 #include <cstdlib>
 #include <iostream>
+#include <fstream>
+#include <filesystem>
 #include <algorithm>
 #include <map>
 #include <set>
 #include <stdexcept>
+
+static std::string resolveDownloadDir() {
+    std::error_code ec;
+    const char* xdg = std::getenv("XDG_DOWNLOAD_DIR");
+    if (xdg && xdg[0]) {
+        std::filesystem::create_directories(xdg, ec);
+        if (!ec) return xdg;
+    }
+    const char* home = std::getenv("HOME");
+    if (home && home[0]) {
+        std::string dl = std::string(home) + "/Downloads";
+        std::filesystem::create_directories(dl, ec);
+        if (!ec) return dl;
+    }
+    std::filesystem::create_directories("rizzie_downloads", ec);
+    return "rizzie_downloads";
+}
 
 static std::string defaultKeyStorePath() {
     const char* home = std::getenv("HOME");
@@ -357,27 +376,47 @@ void Client::downloadMessage(const std::string& messageId) {
         return;
     }
 
-    std::cout << "Message " << messageId << "  from:" << from << "  [" << sentAt << "]\n";
-    std::cout << "txHash: " << txHash << "\n";
-
+    std::string plaintext;
     if (from == std::to_string(userId)) {
-        std::cout << "Content: [sent message — encrypted to recipient, cannot decrypt]\n";
-        return;
+        plaintext = "[sent message — encrypted to recipient, cannot decrypt]";
+    } else {
+        std::string pkResp = http->get(serverUrl + "/users/" + from + "/pubkey", token);
+        std::string pkB64  = extractField(pkResp, "publicKey");
+        if (pkB64.empty()) {
+            plaintext = "[cannot decrypt — sender public key unavailable]";
+        } else if (!keyStore_.verifyAndPin(from, pkB64)) {
+            plaintext = "[message not decrypted: sender key could not be verified]";
+        } else {
+            try {
+                auto encBytes = CryptoUtils::fromBase64(enc);
+                auto ctBytes  = CryptoUtils::fromBase64(ct);
+                auto senderPk = CryptoUtils::fromBase64(pkB64);
+                plaintext = CryptoUtils::decryptMessage(ctBytes, encBytes, myPrivateKey, senderPk);
+            } catch (const std::exception& e) {
+                plaintext = std::string("[cannot decrypt: ") + e.what() + "]";
+            }
+        }
     }
 
-    std::string pkResp = http->get(serverUrl + "/users/" + from + "/pubkey", token);
-    std::string pkB64  = extractField(pkResp, "publicKey");
-
-    try {
-        if (pkB64.empty()) throw std::runtime_error("sender public key unavailable");
-        auto encBytes = CryptoUtils::fromBase64(enc);
-        auto ctBytes  = CryptoUtils::fromBase64(ct);
-        auto senderPk = CryptoUtils::fromBase64(pkB64);
-        std::string plaintext = CryptoUtils::decryptMessage(ctBytes, encBytes, myPrivateKey, senderPk);
-        std::cout << "Content: " << plaintext << "\n";
-    } catch (...) {
-        std::cout << "Content: [cannot decrypt — key mismatch]\n";
+    std::string filename = resolveDownloadDir() + "/message_" + messageId + ".txt";
+    std::ofstream out(filename);
+    if (out) {
+        out << "Message ID: " << messageId << "\n";
+        out << "From: "       << from      << "\n";
+        out << "Sent at: "    << sentAt    << "\n";
+        out << "Tx Hash: "    << txHash    << "\n";
+        out << "enc: "        << enc       << "\n";
+        out << "ciphertext: " << ct        << "\n";
+        out << "Content: "    << plaintext << "\n";
+        out.close();
+        std::cout << "Saved to " << filename << "\n";
+    } else {
+        std::cerr << "Warning: could not write " << filename << "\n";
     }
+
+    std::cout << "Message " << messageId << "  from:" << from << "  [" << sentAt << "]\n";
+    std::cout << "Tx Hash: "    << txHash    << "\n";
+    std::cout << "Content: "    << plaintext << "\n";
 }
 
 void Client::revokeAccess(const std::string& messageId, int targetUserId) {
