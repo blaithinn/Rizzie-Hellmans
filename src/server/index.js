@@ -24,6 +24,14 @@ app.use((req, res, next) => {
 });
 
 app.use(express.json());
+
+app.get('/api/config', (req, res) => {
+  res.json({
+    rpcUrl: process.env.SEPOLIA_RPC_URL || '',
+    contractAddress: process.env.CONTRACT_ADDRESS || ''
+  });
+});
+
 app.use(express.static(path.join(__dirname, '../../public')));
 
 app.get('/verify', (req, res) => {
