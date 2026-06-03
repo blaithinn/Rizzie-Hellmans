@@ -31,8 +31,7 @@ bool KeyStore::verifyAndPin(const std::string& userId, const std::string& public
 }
 
 std::string KeyStore::getPinnedKey(const std::string& userId) const {
-    auto it = std::find_if(pins_.begin(), pins_.end(),
-        [&userId](const auto& pair) { return pair.first == userId; });
+    auto it = pins_.find(userId);
     if (it == pins_.end()) return "";
     return it->second;
 }

@@ -4,6 +4,8 @@
 #include <string>
 #include <vector>
 #include <cstdlib>
+#include <termios.h>
+#include <unistd.h>
 #include <sodium.h>
 #include "Client.h"
 #include "CryptoUtils.h"
@@ -22,7 +24,21 @@ static void clearScreen() {
     std::cout << "\033[2J\033[H" << std::flush;
 }
 
-static void pause() {
+static std::string readPassword(const char* prompt) {
+    std::cout << prompt << std::flush;
+    struct termios oldt, newt;
+    tcgetattr(STDIN_FILENO, &oldt);
+    newt = oldt;
+    newt.c_lflag &= ~static_cast<tcflag_t>(ECHO);
+    tcsetattr(STDIN_FILENO, TCSANOW, &newt);
+    std::string pw;
+    std::getline(std::cin, pw);
+    tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
+    std::cout << "\n";
+    return pw;
+}
+
+static void waitForEnter() {
     std::cout << "\n" << DIM << "  Press Enter to continue..." << RESET << std::flush;
     std::string dummy;
     std::getline(std::cin, dummy);
@@ -137,9 +153,7 @@ int main() {
 
     clearScreen();
     std::cout << "\n  " << BOLD << CYAN << "Rizzie-Hellmans" << RESET << "  —  Key Setup\n\n";
-    std::cout << "  Enter passphrase: ";
-    std::string passphrase;
-    std::getline(std::cin, passphrase);
+    std::string passphrase = readPassword("  Enter passphrase: ");
     if (passphrase.empty()) {
         std::cerr << "  Passphrase must not be empty\n";
         return 1;
@@ -181,7 +195,7 @@ int main() {
     }
 
     std::cout << "\n  " << DIM << "Public key: " << CryptoUtils::toBase64(myPublicKey) << RESET << "\n";
-    pause();
+    waitForEnter();
 
     Client client("https://rizzie-hellmans.theburkenator.com");
     client.setKeyPair(myPublicKey, myPrivateKey);
@@ -199,29 +213,27 @@ int main() {
 
         switch (choice) {
         case 1: {
-            std::string username, password;
+            std::string username;
             std::cout << "\n  Username: ";
             std::getline(std::cin, username);
-            std::cout << "  Password: ";
-            std::getline(std::cin, password);
+            std::string password = readPassword("  Password: ");
             std::cout << "\n";
             client.registerUser(username, password);
-            pause();
+            waitForEnter();
             break;
         }
         case 2: {
-            std::string username, password;
+            std::string username;
             std::cout << "\n  Username: ";
             std::getline(std::cin, username);
-            std::cout << "  Password: ";
-            std::getline(std::cin, password);
+            std::string password = readPassword("  Password: ");
             std::cout << "\n";
             client.login(username, password);
-            pause();
+            waitForEnter();
             break;
         }
         case 3: {
-            if (!client.isLoggedIn()) { std::cout << "\n  " << YELLOW << "Please login first." << RESET << "\n"; pause(); break; }
+            if (!client.isLoggedIn()) { std::cout << "\n  " << YELLOW << "Please login first." << RESET << "\n"; waitForEnter(); break; }
             // Show inbox so user can see recipient IDs
             drawInbox(client.getCachedMessages(), client.getUserId());
             std::string recipStr, plaintext;
@@ -235,18 +247,18 @@ int main() {
             } catch (...) {
                 std::cerr << "  Invalid recipient ID.\n";
             }
-            pause();
+            waitForEnter();
             break;
         }
         case 4: {
-            if (!client.isLoggedIn()) { std::cout << "\n  " << YELLOW << "Please login first." << RESET << "\n"; pause(); break; }
+            if (!client.isLoggedIn()) { std::cout << "\n  " << YELLOW << "Please login first." << RESET << "\n"; waitForEnter(); break; }
             std::cout << "\n";
             client.fetchAndDecryptMessages();
-            pause();
+            waitForEnter();
             break;
         }
         case 5: {
-            if (!client.isLoggedIn()) { std::cout << "\n  " << YELLOW << "Please login first." << RESET << "\n"; pause(); break; }
+            if (!client.isLoggedIn()) { std::cout << "\n  " << YELLOW << "Please login first." << RESET << "\n"; waitForEnter(); break; }
             // Show inbox so user can see message IDs and recipient user IDs at a glance
             drawInbox(client.getCachedMessages(), client.getUserId());
             std::string msgId, recipStr;
@@ -260,23 +272,20 @@ int main() {
             } catch (...) {
                 std::cerr << "  Invalid recipient ID.\n";
             }
-            pause();
+            waitForEnter();
             break;
         }
         case 6: {
-            if (!client.isLoggedIn()) { std::cout << "\n  " << YELLOW << "Please login first." << RESET << "\n"; pause(); break; }
-            std::string current, next;
-            std::cout << "\n  Current password: ";
-            std::getline(std::cin, current);
-            std::cout << "  New password:     ";
-            std::getline(std::cin, next);
+            if (!client.isLoggedIn()) { std::cout << "\n  " << YELLOW << "Please login first." << RESET << "\n"; waitForEnter(); break; }
+            std::string current = readPassword("\n  Current password: ");
+            std::string next    = readPassword("  New password:     ");
             std::cout << "\n";
             client.changePassword(current, next);
-            pause();
+            waitForEnter();
             break;
         }
         case 7: {
-            if (!client.isLoggedIn()) { std::cout << "\n  " << YELLOW << "Please login first." << RESET << "\n"; pause(); break; }
+            if (!client.isLoggedIn()) { std::cout << "\n  " << YELLOW << "Please login first." << RESET << "\n"; waitForEnter(); break; }
             // Show inbox so user can pick a message ID to download
             drawInbox(client.getCachedMessages(), client.getUserId());
             std::string msgId;
@@ -284,11 +293,11 @@ int main() {
             std::getline(std::cin, msgId);
             std::cout << "\n";
             client.downloadMessage(msgId);
-            pause();
+            waitForEnter();
             break;
         }
         case 8: {
-            if (!client.isLoggedIn()) { std::cout << "\n  " << YELLOW << "Please login first." << RESET << "\n"; pause(); break; }
+            if (!client.isLoggedIn()) { std::cout << "\n  " << YELLOW << "Please login first." << RESET << "\n"; waitForEnter(); break; }
             // Show inbox so user can see message IDs and the user IDs they shared with
             drawInbox(client.getCachedMessages(), client.getUserId());
             std::string msgId, uidStr;
@@ -302,11 +311,11 @@ int main() {
             } catch (...) {
                 std::cerr << "  Invalid user ID.\n";
             }
-            pause();
+            waitForEnter();
             break;
         }
         case 9: {
-            if (!client.isLoggedIn()) { std::cout << "\n  " << YELLOW << "Please login first." << RESET << "\n"; pause(); break; }
+            if (!client.isLoggedIn()) { std::cout << "\n  " << YELLOW << "Please login first." << RESET << "\n"; waitForEnter(); break; }
             // Show inbox so user can see message IDs before deleting
             drawInbox(client.getCachedMessages(), client.getUserId());
             std::string msgId;
@@ -314,7 +323,7 @@ int main() {
             std::getline(std::cin, msgId);
             std::cout << "\n";
             client.deleteMessage(msgId);
-            pause();
+            waitForEnter();
             break;
         }
         case 0:
@@ -323,7 +332,7 @@ int main() {
             return 0;
         default:
             std::cout << "\n  " << YELLOW << "Invalid choice — enter 0–9." << RESET << "\n";
-            pause();
+            waitForEnter();
             break;
         }
     }

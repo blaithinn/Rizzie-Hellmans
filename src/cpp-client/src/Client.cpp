@@ -382,14 +382,19 @@ void Client::downloadMessage(const std::string& messageId) {
     } else {
         std::string pkResp = http->get(serverUrl + "/users/" + from + "/pubkey", token);
         std::string pkB64  = extractField(pkResp, "publicKey");
-        try {
-            if (pkB64.empty()) throw std::runtime_error("sender public key unavailable");
-            auto encBytes = CryptoUtils::fromBase64(enc);
-            auto ctBytes  = CryptoUtils::fromBase64(ct);
-            auto senderPk = CryptoUtils::fromBase64(pkB64);
-            plaintext = CryptoUtils::decryptMessage(ctBytes, encBytes, myPrivateKey, senderPk);
-        } catch (...) {
-            plaintext = "[cannot decrypt — key mismatch]";
+        if (pkB64.empty()) {
+            plaintext = "[cannot decrypt — sender public key unavailable]";
+        } else if (!keyStore_.verifyAndPin(from, pkB64)) {
+            plaintext = "[message not decrypted: sender key could not be verified]";
+        } else {
+            try {
+                auto encBytes = CryptoUtils::fromBase64(enc);
+                auto ctBytes  = CryptoUtils::fromBase64(ct);
+                auto senderPk = CryptoUtils::fromBase64(pkB64);
+                plaintext = CryptoUtils::decryptMessage(ctBytes, encBytes, myPrivateKey, senderPk);
+            } catch (const std::exception& e) {
+                plaintext = std::string("[cannot decrypt: ") + e.what() + "]";
+            }
         }
     }
 

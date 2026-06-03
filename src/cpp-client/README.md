@@ -38,25 +38,40 @@ cmake -B build -S .
 cmake --build build
 ```
 
-## Run smoke test
+## Run
 
 ```bash
 ./build/client
 ```
 
-Expected output ends with `Encrypt/decrypt round-trip OK.`
+On first launch you will be prompted for a passphrase used to encrypt your local
+private key at rest. On subsequent launches the same passphrase unlocks the
+existing key. The TUI menu then provides all messaging operations.
 
 ## Crypto design
 
-Each outgoing message generates a fresh ephemeral X25519 key pair.
-The ephemeral private key performs the DH with the recipient's static public key;
-the ephemeral public key is transmitted as the `enc` field.
-The shared secret is key-derived via HKDF-SHA256 (libsodium 1.0.19 native API)
-and used as an AES-256-GCM key to encrypt the plaintext.
+Each outgoing message uses a two-DH construction equivalent to HPKE `Mode_Auth`
+(RFC 9180 §5.1.3):
 
-This matches the server API contract:
+1. A fresh ephemeral X25519 key pair is generated per message.
+2. Two Diffie-Hellman operations are performed:
+   - `eph_dh  = X25519(eph_sk,    recipient_pk)` — provides per-message confidentiality
+   - `static_dh = X25519(sender_sk, recipient_pk)` — cryptographically binds sender identity
+3. `HKDF-SHA256(IKM = eph_dh ‖ static_dh, info = "securechat-v2" ‖ eph_pk)` derives the AES key.
+4. `AES-256-GCM` encrypts the plaintext with the ephemeral public key (`eph_pk`) as AAD.
+
+The static DH means that only the holder of `sender_sk` could have produced a
+ciphertext that decrypts correctly under the recipient's key — providing sender
+authentication without a separate signature. The ephemeral public key is transmitted
+as the `enc` field and is bound as AEAD additional data so any tampering with it is
+detected at decryption.
+
+Server API contract:
 
 - **POST /messages** body: `{ "to": "<userId>", "enc": "<base64>", "ciphertext": "<base64>" }`
 - **GET /messages** response includes `enc` and `ciphertext` fields per message
 
-The `ciphertext` field is `nonce (12 bytes) || ciphertext+tag` encoded as base64.
+The `ciphertext` field layout: `nonce (12 bytes) || ciphertext+tag`, base64-encoded.
+
+See `crypto_design_document.md` at the repo root for the full threat model,
+parameter-level justifications, and known limitations.

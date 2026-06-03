@@ -11,7 +11,7 @@ const std::vector<Message>& MessageStore::getAllMessages() const {
 }
 
 const Message* MessageStore::findById(const std::string& id) const {
-    auto it = std::find_if(messages.begin(), messages.end(),
-        [&id](const Message& m) { return m.getId() == id; });
-    return it != messages.end() ? &(*it) : nullptr;
+    auto it = indexById.find(id);
+    if (it == indexById.end()) return nullptr;
+    return &messages[it->second];
 }
