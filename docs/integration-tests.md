@@ -142,7 +142,7 @@ VALID_CT="AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
   ```json
   {
     "rpcUrl": "https://eth-sepolia.g.alchemy.com/v2/...",
-    "contractAddress": "0xA1bdB7222B244417CCaB6EAeD2cd3d27dADee65A"
+    "contractAddress": "0xe562bD4F0E06783a7133Dc1d4dD486406eD753DC"
   }
   ```
   HTTP 200. No authentication required.

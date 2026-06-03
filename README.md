@@ -3,7 +3,7 @@
 **CS4455 Cybersecurity — Epic Project 2026**
 Team 18 | Blaithin Kavanagh · Rose McInerney
 Live server: `rizzie-hellmans.theburkenator.com`
-Contract (Sepolia): `0xA1bdB7222B244417CCaB6EAeD2cd3d27dADee65A`
+Contract (Sepolia): `0xe562bD4F0E06783a7133Dc1d4dD486406eD753DC`
 
 ---
 
@@ -38,7 +38,7 @@ The system has three components:
                                                ┌──────────▼──────────┐
                                                │  Ethereum Sepolia   │
                                                │  MessageHash.sol    │
-                                               │  0xA1bdB72…        │
+                                               │  0xe562bD4…        │
                                                └─────────────────────┘
 ```
 
@@ -119,7 +119,7 @@ The `.env` file lives in the repository root on the VM. `JWT_SECRET` is mandator
 JWT_SECRET=<a long random secret>
 SEPOLIA_RPC_URL=https://eth-sepolia.g.alchemy.com/v2/<your-alchemy-key>
 SERVER_WALLET_PRIVATE_KEY=<ethereum wallet private key with Sepolia ETH>
-CONTRACT_ADDRESS=0xA1bdB7222B244417CCaB6EAeD2cd3d27dADee65A
+CONTRACT_ADDRESS=0xe562bD4F0E06783a7133Dc1d4dD486406eD753DC
 ```
 
 ---
@@ -281,7 +281,7 @@ hash = keccak256(base64_decode(enc) || base64_decode(ciphertext))
 The resulting transaction hash is stored in SQLite alongside the message and returned to the client.
 
 ### Contract
-- **Address:** `0xA1bdB7222B244417CCaB6EAeD2cd3d27dADee65A`
+- **Address:** `0xe562bD4F0E06783a7133Dc1d4dD486406eD753DC`
 - **Network:** Ethereum Sepolia testnet
 - **ABI and deployment details:** `docs/blockchain/contract.json`
 - **Functions:** `storeHash(bytes32)`, `getHash(uint256)`, `getRecordCount()`
